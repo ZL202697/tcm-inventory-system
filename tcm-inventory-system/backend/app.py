@@ -123,13 +123,18 @@ def item_to_camel(row):
 
 
 def add_log(herb_code, herb_name, action, changes, operator, operator_name):
-    execute(
-        """INSERT INTO operation_logs
-           (herb_code, herb_name, action, changes, operator, operator_name, timestamp, time_str)
-           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
-        (herb_code, herb_name, action, json.dumps(changes, ensure_ascii=False, default=str),
-         operator, operator_name, int(time.time() * 1000), time.strftime("%Y/%m/%d %H:%M:%S")),
-    )
+    try:
+        now_ms = int(time.time() * 1000)
+        time_str = time.strftime("%Y/%m/%d %H:%M:%S", time.localtime(now_ms / 1000 + 8 * 3600))
+        execute(
+            """INSERT INTO operation_logs
+               (herb_code, herb_name, action, changes, operator, operator_name, timestamp, time_str)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+            (herb_code, herb_name, action, json.dumps(changes, ensure_ascii=False, default=str),
+             operator, operator_name, now_ms, time_str),
+        )
+    except Exception:
+        pass
 
 
 def add_stock_transaction(herb_code, herb_name, tx_type, quantity, reference_type=None,
@@ -145,6 +150,26 @@ def add_stock_transaction(herb_code, herb_name, tx_type, quantity, reference_typ
         (herb_code, herb_name, tx_type, quantity, balance, reference_type, reference_id,
          remark, operator, operator_name, time.strftime("%Y/%m/%d %H:%M:%S")),
     )
+
+
+def _day_start_ms(days_ago=0):
+    import datetime as _dt
+    bj = _dt.timezone(_dt.timedelta(hours=8))
+    d = (_dt.datetime.now(bj) - _dt.timedelta(days=days_ago)).replace(hour=0, minute=0, second=0, microsecond=0)
+    return int(d.astimezone(_dt.timezone.utc).timestamp() * 1000)
+
+
+def _log_row(r):
+    try:
+        changes = json.loads(r["changes"]) if r["changes"] else {}
+    except Exception:
+        changes = {}
+    return {
+        "id": f"log_{r['id']}", "herbCode": r["herb_code"], "herbName": r["herb_name"],
+        "action": r["action"], "changes": changes,
+        "operator": r["operator"], "operatorName": r["operator_name"],
+        "timestamp": r["timestamp"], "timeStr": r["time_str"],
+    }
 
 
 # ============ 页面路由 ============
@@ -168,6 +193,7 @@ def login():
         return fail("该账号已被禁用，请联系管理员")
     if user["status"] == "pending":
         return fail("账号正在审核中，请等待管理员审核通过后再登录")
+    add_log(None, None, "login", {"summary": "登录账号：%s（%s）" % (user["username"], user["name"])}, user["username"], user["name"])
     return ok({"username": user["username"], "role": user["role"], "name": user["name"], "phone": user["phone"]})
 
 
@@ -195,6 +221,7 @@ def register():
         (username, sha256_pwd(password), role, name, phone, "pending", department, license_no,
          time.strftime("%Y/%m/%d %H:%M:%S")),
     )
+    add_log(None, None, "register", {"summary": "医生注册申请：%s（%s）" % (name, username)}, username, name)
     return ok(None, "注册成功，您的账号正在审核中，请等待管理员审核通过后再登录")
 
 
@@ -232,7 +259,7 @@ def add_herb():
         (code, name, d.get("category"), d.get("origin"), d.get("storage"), d.get("unit"),
          d.get("price", 0), d.get("quantity", 0), d.get("warningThreshold", 200), d.get("description")),
     )
-    add_log(code, name, "add", d, user["username"], user["name"])
+    add_log(code, name, "add", {"summary": "新增药材：%s（%s）" % (name, code), **d}, user["username"], user["name"])
     return ok(None, "药材添加成功")
 
 
@@ -253,7 +280,7 @@ def update_herb(code):
          d.get("price", old["price"]), d.get("quantity", old["quantity"]),
          d.get("warningThreshold", old["warning_threshold"]), d.get("description", old["description"]), code),
     )
-    add_log(code, old["name"], "edit", d, user["username"], user["name"])
+    add_log(code, old["name"], "edit", {"summary": "编辑药材：%s（%s）" % (old["name"], code), **d}, user["username"], user["name"])
     return ok(None, "药材更新成功")
 
 
@@ -266,7 +293,7 @@ def delete_herb(code):
     if not old:
         return fail("药材不存在")
     execute("DELETE FROM herbs WHERE code = %s", (code,))
-    add_log(code, old["name"], "delete", old, user["username"], user["name"])
+    add_log(code, old["name"], "delete", {"summary": "删除药材：%s（%s）" % (old["name"], code), **old}, user["username"], user["name"])
     return ok(None, "药材删除成功")
 
 
@@ -299,7 +326,7 @@ def list_pending_users():
 
 @app.route("/api/users/<username>/approve", methods=["POST"])
 def approve_user(username):
-    _, err = require_admin()
+    admin, err = require_admin()
     if err:
         return err
     user = query("SELECT * FROM users WHERE username = %s", (username,), one=True)
@@ -308,12 +335,13 @@ def approve_user(username):
     if user["status"] != "pending":
         return fail("该用户不是待审核状态")
     execute("UPDATE users SET status = 'active' WHERE username = %s", (username,))
+    add_log(None, None, "user_approve", {"summary": "医生注册审核通过：%s（%s）" % (user["name"], username)}, admin["username"], admin["name"])
     return ok(None, "审核通过，用户已激活")
 
 
 @app.route("/api/users/<username>/reject", methods=["POST"])
 def reject_user(username):
-    _, err = require_admin()
+    admin, err = require_admin()
     if err:
         return err
     data = request.get_json(silent=True) or {}
@@ -325,12 +353,13 @@ def reject_user(username):
         return fail("该用户不是待审核状态")
     # 拒绝后删除用户（或改为inactive，这里选择删除避免垃圾数据）
     execute("DELETE FROM users WHERE username = %s", (username,))
+    add_log(None, None, "user_reject", {"summary": "驳回医生注册：%s（%s）" % (user["name"], username)}, admin["username"], admin["name"])
     return ok(None, "已拒绝该注册申请" + (f"，原因：{reason}" if reason else ""))
 
 
 @app.route("/api/users/<username>/toggle-status", methods=["POST"])
 def toggle_user_status(username):
-    _, err = require_admin()
+    admin, err = require_admin()
     if err:
         return err
     user = query("SELECT * FROM users WHERE username = %s", (username,), one=True)
@@ -340,12 +369,13 @@ def toggle_user_status(username):
         return fail("不能禁用超级管理员账号")
     new_status = "inactive" if user["status"] == "active" else "active"
     execute("UPDATE users SET status = %s WHERE username = %s", (new_status, username))
+    add_log(None, None, "user_toggle", {"summary": "%s用户：%s（%s）" % ("禁用" if new_status == "inactive" else "启用", user["name"], username)}, admin["username"], admin["name"])
     return ok({"status": new_status}, "已" + ("禁用" if new_status == "inactive" else "启用") + "该账号")
 
 
 @app.route("/api/users", methods=["POST"])
 def create_user():
-    _, err = require_admin()
+    admin, err = require_admin()
     if err:
         return err
     data = request.get_json(silent=True) or {}
@@ -376,12 +406,13 @@ def create_user():
     execute(sql_insert, (username, sha256_pwd(password), role, name, phone, status,
                          department, license_no,
                          time.strftime("%Y/%m/%d %H:%M:%S")))
+    add_log(None, None, "user_add", {"summary": "新增用户：%s（%s，%s）" % (name, username, role)}, admin["username"], admin["name"])
     return ok(None, "用户添加成功")
 
 
 @app.route("/api/users/<username>", methods=["PUT"])
 def update_user(username):
-    _, err = require_admin()
+    admin, err = require_admin()
     if err:
         return err
     data = request.get_json(silent=True) or {}
@@ -427,22 +458,24 @@ def update_user(username):
     vals.append(username)
     sql = "UPDATE users SET " + ", ".join(fields) + " WHERE username = %s"
     execute(sql, tuple(vals))
+    add_log(None, None, "user_edit", {"summary": "编辑用户：%s（%s）" % (user["name"], username)}, admin["username"], admin["name"])
     return ok(None, "用户信息更新成功")
 
 
 @app.route("/api/users/<username>", methods=["DELETE"])
 def delete_user(username):
-    _, err = require_admin()
+    admin, err = require_admin()
     if err:
         return err
     if username == "admin":
         return fail("不能删除超级管理员账号")
 
-    user = query("SELECT username FROM users WHERE username = %s", (username,), one=True)
+    user = query("SELECT * FROM users WHERE username = %s", (username,), one=True)
     if not user:
         return fail("用户不存在")
 
     execute("DELETE FROM users WHERE username = %s", (username,))
+    add_log(None, None, "user_delete", {"summary": "删除用户：%s（%s）" % (user["name"], username)}, admin["username"], admin["name"])
     return ok(None, "用户删除成功")
 
 
@@ -452,12 +485,38 @@ def list_logs():
     _, err = require_admin()
     if err:
         return err
-    rows = query("SELECT * FROM operation_logs ORDER BY timestamp DESC LIMIT 500")
-    return ok([{
-        "id": f"log_{r['id']}", "herbCode": r["herb_code"], "herbName": r["herb_name"],
-        "action": r["action"], "operator": r["operator"], "operatorName": r["operator_name"],
-        "timestamp": r["timestamp"], "timeStr": r["time_str"],
-    } for r in rows])
+    herb = (request.args.get("herb") or "").strip()
+    action = (request.args.get("action") or "").strip()
+    time_filter = (request.args.get("time") or "").strip()
+    keyword = (request.args.get("keyword") or "").strip()
+    sql = "SELECT * FROM operation_logs WHERE 1=1"
+    args = []
+    if herb:
+        sql += " AND herb_name = %s"
+        args.append(herb)
+    if action:
+        sql += " AND action = %s"
+        args.append(action)
+    now_ms = int(time.time() * 1000)
+    if time_filter == "today":
+        sql += " AND timestamp >= %s"
+        args.append(_day_start_ms(0))
+    elif time_filter == "week":
+        sql += " AND timestamp >= %s"
+        args.append(now_ms - 7 * 86400000)
+    elif time_filter == "month":
+        sql += " AND timestamp >= %s"
+        args.append(now_ms - 30 * 86400000)
+    elif time_filter == "quarter":
+        sql += " AND timestamp >= %s"
+        args.append(now_ms - 90 * 86400000)
+    if keyword:
+        like = f"%{keyword}%"
+        sql += " AND (operator LIKE %s OR operator_name LIKE %s OR changes LIKE %s OR herb_name LIKE %s)"
+        args += [like, like, like, like]
+    sql += " ORDER BY timestamp DESC LIMIT 500"
+    rows = query(sql, tuple(args))
+    return ok([_log_row(r) for r in rows])
 
 
 # ============ 仪表盘 ============
@@ -474,11 +533,7 @@ def dashboard():
     return ok({
         "herbs": herb_list, "totalCount": len(herb_list),
         "totalQuantity": total_quantity, "lowStock": low_stock,
-        "logs": [{
-            "id": f"log_{r['id']}", "herbCode": r["herb_code"], "herbName": r["herb_name"],
-            "action": r["action"], "operator": r["operator"], "operatorName": r["operator_name"],
-            "timestamp": r["timestamp"], "timeStr": r["time_str"],
-        } for r in logs],
+        "logs": [_log_row(r) for r in logs],
     })
 
 
@@ -584,6 +639,7 @@ def create_prescription():
             (rx_id, item.get("herbCode"), item.get("herbName"), item.get("dosage"),
              item.get("usage"), qty, price, subtotal),
         )
+    add_log(None, None, "rx_create", {"summary": "新建处方 %s：患者 %s，%d 味药材" % (rx_no, patient_name, len(items))}, user["username"], user["name"])
     return ok({"id": rx_id, "prescriptionNo": rx_no}, "处方创建成功，等待审核")
 
 
@@ -607,6 +663,7 @@ def audit_prescription(rx_id):
         "UPDATE prescriptions SET status=%s, audit_remark=%s, auditor=%s, auditor_name=%s, audit_time=%s WHERE id=%s",
         (new_status, remark, user["username"], user["name"], time.strftime("%Y/%m/%d %H:%M:%S"), rx_id),
     )
+    add_log(None, None, "rx_audit", {"summary": "审核处方 #%s（患者 %s）→%s" % (rx_id, row["patient_name"], "通过" if action == "approve" else "拒绝")}, user["username"], user["name"])
     return ok(None, f"处方已{'通过' if action == 'approve' else '拒绝'}")
 
 
@@ -642,6 +699,7 @@ def dispense_prescription(rx_id):
         "UPDATE prescriptions SET status='dispensed', dispenser=%s, dispenser_name=%s, dispense_time=%s WHERE id=%s",
         (user["username"], user["name"], time.strftime("%Y/%m/%d %H:%M:%S"), rx_id),
     )
+    add_log(None, None, "rx_dispense", {"summary": "处方发药 #%s（患者 %s），扣减 %d 味药材库存" % (rx_id, row["patient_name"], len(items))}, user["username"], user["name"])
     return ok(None, "处方发药成功，库存已扣减")
 
 
@@ -657,6 +715,7 @@ def delete_prescription(rx_id):
         return fail("已发药的处方不能删除")
     execute("DELETE FROM prescription_items WHERE prescription_id = %s", (rx_id,))
     execute("DELETE FROM prescriptions WHERE id = %s", (rx_id,))
+    add_log(None, None, "rx_delete", {"summary": "删除处方 #%s（患者 %s）" % (rx_id, row["patient_name"])}, user["username"], user["name"])
     return ok(None, "处方删除成功")
 
 
@@ -815,6 +874,7 @@ def add_supplier():
         (name, d.get("contactPerson"), d.get("phone"), d.get("address"),
          d.get("description"), d.get("status", "active"))
     )
+    add_log(None, None, "supplier_add", {"summary": "新增供应商：%s" % name}, user["username"], user["name"])
     return ok(None, "供应商添加成功")
 
 
@@ -834,6 +894,7 @@ def update_supplier(sid):
          d.get("phone", old["phone"]), d.get("address", old["address"]),
          d.get("description", old["description"]), d.get("status", old["status"]), sid)
     )
+    add_log(None, None, "supplier_edit", {"summary": "编辑供应商：%s（#%s）" % (old["name"], sid)}, user["username"], user["name"])
     return ok(None, "供应商更新成功")
 
 
@@ -842,7 +903,9 @@ def delete_supplier(sid):
     user, err = require_admin()
     if err:
         return err
+    old = query("SELECT * FROM suppliers WHERE id = %s", (sid,), one=True)
     execute("DELETE FROM suppliers WHERE id = %s", (sid,))
+    add_log(None, None, "supplier_delete", {"summary": "删除供应商：%s（#%s）" % (old["name"] if old else sid, sid)}, user["username"], user["name"])
     return ok(None, "供应商删除成功")
 
 
@@ -953,6 +1016,7 @@ def create_purchase_order():
             (po_id, item.get("herbCode"), item.get("herbName"), qty,
              item.get("unit", "g"), price, subtotal)
         )
+    add_log(None, None, "po_create", {"summary": "创建采购单 %s：供应商 %s，%d 项，总额 %.2f" % (po_no, supplier_name, len(items), total)}, user["username"], user["name"])
     return ok({"id": po_id, "orderNo": po_no}, "采购单创建成功，等待审核")
 
 
@@ -975,6 +1039,7 @@ def audit_purchase_order(po_id):
         "UPDATE purchase_orders SET status=%s, auditor=%s, auditor_name=%s, audit_time=%s WHERE id=%s",
         (new_status, user["username"], user["name"], time.strftime("%Y/%m/%d %H:%M:%S"), po_id)
     )
+    add_log(None, None, "po_audit", {"summary": "审核采购单 %s →%s" % (row["order_no"], "通过" if action == "approve" else "拒绝")}, user["username"], user["name"])
     return ok(None, f"采购单已{'通过' if action == 'approve' else '拒绝'}")
 
 
@@ -1007,6 +1072,7 @@ def purchase_order_in_stock(po_id):
         "UPDATE purchase_orders SET status='completed', in_stock_time=%s WHERE id=%s",
         (time.strftime("%Y/%m/%d %H:%M:%S"), po_id)
     )
+    add_log(None, None, "po_in_stock", {"summary": "采购入库 %s：%d 项药材，库存已增加" % (row["order_no"], len(items))}, user["username"], user["name"])
     return ok(None, "采购入库成功，库存已更新")
 
 
@@ -1022,6 +1088,7 @@ def delete_purchase_order(po_id):
         return fail("已入库的采购单不能删除")
     execute("DELETE FROM purchase_items WHERE purchase_id = %s", (po_id,))
     execute("DELETE FROM purchase_orders WHERE id = %s", (po_id,))
+    add_log(None, None, "po_delete", {"summary": "删除采购单 %s" % row["order_no"]}, user["username"], user["name"])
     return ok(None, "采购单删除成功")
 
 
