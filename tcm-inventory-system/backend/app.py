@@ -13,7 +13,6 @@ import json
 import os
 import time
 
-from urllib.parse import unquote
 
 from flask import Flask, jsonify, request, send_from_directory
 
@@ -40,14 +39,9 @@ def fail(message, code=1, http=200):
 
 
 def get_current_user():
-    raw = request.headers.get("X-User", "").strip()
-    if not raw:
+    username = request.headers.get("X-User", "").strip()
+    if not username:
         return None
-    # 前端对用户名做了 base64 编码（支持中文用户名），这里解码
-    try:
-        username = base64.b64decode(raw.encode("ascii")).decode("utf-8")
-    except Exception:
-        username = raw
     return query("SELECT * FROM users WHERE username = %s", (username,), one=True)
 
 
