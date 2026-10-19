@@ -378,7 +378,14 @@ const API_BASE = '';
     async function api(method, url, body) {
       const opts = { method, headers: { 'Content-Type': 'application/json', 'X-User': sessionStorage.getItem('current_user') || '' } };
       if (body !== undefined) opts.body = JSON.stringify(body);
-      const resp = await fetch(API_BASE + url, opts);
+      let resp;
+      try {
+        resp = await fetch(API_BASE + url, opts);
+      } catch (e) {
+        console.error('请求失败:', e);
+        alert('网络请求失败，请检查网络连接或登录状态后重试。');
+        throw e;
+      }
       const result = await resp.json().catch(() => ({ code: -1, message: '服务器连接失败' }));
       if (result.code !== 0) { alert(result.message); throw new Error(result.message); }
       return result.data;
