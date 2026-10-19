@@ -157,10 +157,6 @@
 
     <!-- 注册表单 -->
     <div id="register-form" class="hidden">
-      <!-- 角色选择 -->
-      <div class="flex justify-center gap-3 mb-4">
-        <button class="role-tab active" data-role="doctor">医生</button>
-      </div>
       <p class="text-xs text-gray-500 text-center mb-4">
         医生注册需填写执业信息，经管理员审核通过后方可使用
       </p>
@@ -173,7 +169,7 @@
       <input type="text" id="reg-phone" class="form-input" placeholder="联系电话 *">
 
       <!-- 医生专属 -->
-      <div id="doctor-fields" class="hidden">
+      <div id="doctor-fields">
         <input type="text" id="reg-department" class="form-input" placeholder="所属科室 *">
         <input type="text" id="reg-license" class="form-input" placeholder="执业医师证号 *">
         <p class="text-xs text-amber-600 mb-3">⚠️ 医生账号需管理员审核通过后才能登录使用</p>
@@ -205,7 +201,6 @@
 
     document.addEventListener('DOMContentLoaded', function() {
       initMainTabs();
-      initRoleTabs();
       initAuthHandlers();
       checkLoggedIn();
     });
@@ -228,22 +223,6 @@
         loginTab.classList.remove('active');
         registerForm.classList.remove('hidden');
         loginForm.classList.add('hidden');
-      });
-    }
-
-    function initRoleTabs() {
-      const roleTabs = document.querySelectorAll('.role-tab');
-      const doctorFields = document.getElementById('doctor-fields');
-
-      roleTabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-          roleTabs.forEach(t => t.classList.remove('active'));
-          tab.classList.add('active');
-
-          const role = tab.dataset.role;
-          doctorFields.classList.add('hidden');
-          if (role === 'doctor') doctorFields.classList.remove('hidden');
-        });
       });
     }
 
@@ -278,7 +257,7 @@
       const confirmPwd = document.getElementById('reg-confirm-password').value;
       const name = document.getElementById('reg-name').value.trim();
       const phone = document.getElementById('reg-phone').value.trim();
-      const currentRole = document.querySelector('.role-tab.active').dataset.role;
+      const currentRole = 'doctor';
 
       if (!username || !password || !confirmPwd || !name || !phone) {
         alert('请填写所有必填字段');
