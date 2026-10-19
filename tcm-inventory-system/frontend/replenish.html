@@ -367,7 +367,7 @@ const API_BASE = '';
         return;
       }
       tbody.innerHTML = items.map(s => {
-        const daysColor = s.daysRemaining <= 7 ? 'text-red-600 font-bold' : s.daysRemaining <= 15 ? 'text-yellow-600' : 'text-gray-600';
+        const daysColor = s.daysRemaining === null ? 'text-gray-600' : s.daysRemaining <= 7 ? 'text-red-600 font-bold' : s.daysRemaining <= 15 ? 'text-yellow-600' : 'text-gray-600';
         return `
           <tr class="hover:bg-gray-50">
             <td class="px-4 py-3"><span class="priority-badge priority-${s.priority}" style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:500;">${PRIORITY_TEXT[s.priority] || s.priority}</span></td>
@@ -377,7 +377,7 @@ const API_BASE = '';
             </td>
             <td class="px-4 py-3 text-sm">${s.currentStock} ${s.unit}</td>
             <td class="px-4 py-3 text-sm">${s.dailyAvgUsage} ${s.unit}/天</td>
-            <td class="px-4 py-3 text-sm ${daysColor}">${s.daysRemaining >= 999 ? '∞' : s.daysRemaining + ' 天'}</td>
+            <td class="px-4 py-3 text-sm ${daysColor}">${s.daysRemaining === null ? '—' : s.daysRemaining + ' 天'}</td>
             <td class="px-4 py-3 text-sm font-medium text-primary">${s.suggestedQuantity} ${s.unit}</td>
             <td class="px-4 py-3 text-sm font-medium text-gray-800">¥${s.estimatedCost.toFixed(2)}</td>
             <td class="px-4 py-3">
