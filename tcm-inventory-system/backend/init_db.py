@@ -470,13 +470,44 @@ def _init_mysql():
                 """CREATE TABLE IF NOT EXISTS prescription_items (
                     id INT AUTO_INCREMENT PRIMARY KEY, prescription_id INT NOT NULL,
                     herb_code VARCHAR(50), herb_name VARCHAR(50) NOT NULL, dosage VARCHAR(30),
-                    usage VARCHAR(100), quantity INT DEFAULT 1, price DECIMAL(10,2) DEFAULT 0,
+                    `usage` VARCHAR(100), quantity INT DEFAULT 1, price DECIMAL(10,2) DEFAULT 0,
                     subtotal DECIMAL(10,2) DEFAULT 0, INDEX idx_prescription (prescription_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
+                """CREATE TABLE IF NOT EXISTS suppliers (
+                    id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(100) NOT NULL,
+                    contact_person VARCHAR(50), phone VARCHAR(30), address VARCHAR(200),
+                    description TEXT, status VARCHAR(20) DEFAULT 'active',
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
+                """CREATE TABLE IF NOT EXISTS purchase_orders (
+                    id INT AUTO_INCREMENT PRIMARY KEY, order_no VARCHAR(50) NOT NULL UNIQUE,
+                    supplier_id INT, supplier_name VARCHAR(100), total_amount DECIMAL(10,2) DEFAULT 0,
+                    status VARCHAR(20) NOT NULL DEFAULT 'pending', remark TEXT,
+                    creator VARCHAR(50), creator_name VARCHAR(50), auditor VARCHAR(50), auditor_name VARCHAR(50),
+                    audit_time VARCHAR(50), in_stock_time VARCHAR(50),
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_po_status (status)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
+                """CREATE TABLE IF NOT EXISTS purchase_items (
+                    id INT AUTO_INCREMENT PRIMARY KEY, purchase_id INT NOT NULL,
+                    herb_code VARCHAR(50), herb_name VARCHAR(50) NOT NULL,
+                    quantity INT DEFAULT 0, unit VARCHAR(20), price DECIMAL(10,2) DEFAULT 0,
+                    subtotal DECIMAL(10,2) DEFAULT 0, received_quantity INT DEFAULT 0,
+                    INDEX idx_pi_purchase (purchase_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
+                """CREATE TABLE IF NOT EXISTS stock_transactions (
+                    id INT AUTO_INCREMENT PRIMARY KEY, herb_code VARCHAR(50) NOT NULL, herb_name VARCHAR(50) NOT NULL,
+                    type VARCHAR(20) NOT NULL, quantity INT NOT NULL, balance_after INT,
+                    reference_type VARCHAR(50), reference_id VARCHAR(50), remark TEXT,
+                    operator VARCHAR(50), operator_name VARCHAR(50),
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_st_herb (herb_code), INDEX idx_st_type (type)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
             ]
             for sql in mysql_tables:
                 cur.execute(sql)
-            print("  5张表创建完成")
+            print("  9张表创建完成")
 
             # 写入默认数据（复用 SQLite 的数据，用 MySQL 语法）
             print("[2/4] 写入默认账号 ...")
@@ -495,7 +526,37 @@ def _init_mysql():
                     (h["code"], h["name"], h["category"], h["origin"], h["storage"], h["unit"],
                      h["price"], h["quantity"], h["warning_threshold"], h["description"]))
 
-            print("[4/4] 写入示例处方 ...")
+            print("[4/4] 写入示例供应商与采购单 ...")
+            for s in SAMPLE_SUPPLIERS:
+                cur.execute("SELECT id FROM suppliers WHERE name=%s", (s["name"],))
+                if cur.fetchone():
+                    continue
+                cur.execute("""INSERT INTO suppliers (name,contact_person,phone,address,description,status)
+                    VALUES (%s,%s,%s,%s,%s,%s)""",
+                    (s["name"], s["contact_person"], s["phone"], s["address"], s["description"], s["status"]))
+            for p in SAMPLE_PURCHASE_ORDERS:
+                cur.execute("SELECT id FROM purchase_orders WHERE order_no=%s", (p["order_no"],))
+                if cur.fetchone():
+                    continue
+                total = sum(item["quantity"] * item["price"] for item in p["items"])
+                cur.execute("""INSERT INTO purchase_orders
+                    (order_no,supplier_id,supplier_name,total_amount,status,remark,creator,creator_name,
+                     auditor,auditor_name,audit_time,in_stock_time)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                    (p["order_no"], p["supplier_id"], p["supplier_name"], round(total, 2), p["status"],
+                     p.get("remark"), p.get("creator"), p.get("creator_name"), p.get("auditor"),
+                     p.get("auditor_name"), p.get("audit_time"), p.get("in_stock_time")))
+                po_id = cur.lastrowid
+                for item in p["items"]:
+                    subtotal = round(item["quantity"] * item["price"], 2)
+                    received = item["quantity"] if p["status"] == "completed" else 0
+                    cur.execute("""INSERT INTO purchase_items
+                        (purchase_id,herb_code,herb_name,quantity,unit,price,subtotal,received_quantity)
+                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
+                        (po_id, item["herb_code"], item["herb_name"], item["quantity"],
+                         item["unit"], item["price"], subtotal, received))
+
+            print("[5/4] 写入示例处方 ...")
             for p in SAMPLE_PRESCRIPTIONS:
                 cur.execute("SELECT id FROM prescriptions WHERE prescription_no=%s", (p["prescription_no"],))
                 if cur.fetchone():
@@ -515,7 +576,7 @@ def _init_mysql():
                     dosage_val = float(str(item["dosage"]).replace("g", ""))
                     subtotal = round(dosage_val * item["quantity"] * item["price"], 2)
                     cur.execute("""INSERT INTO prescription_items
-                        (prescription_id,herb_code,herb_name,dosage,usage,quantity,price,subtotal)
+                        (prescription_id,herb_code,herb_name,dosage,`usage`,quantity,price,subtotal)
                         VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
                         (rx_id, item["herb_code"], item["herb_name"], item["dosage"],
                          item["usage"], item["quantity"], item["price"], subtotal))

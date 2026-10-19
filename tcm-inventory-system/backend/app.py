@@ -569,7 +569,7 @@ def create_prescription():
         subtotal = round(dosage_val * qty * price, 2)
         execute(
             """INSERT INTO prescription_items
-               (prescription_id, herb_code, herb_name, dosage, usage, quantity, price, subtotal)
+               (prescription_id, herb_code, herb_name, dosage, `usage`, quantity, price, subtotal)
                VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
             (rx_id, item.get("herbCode"), item.get("herbName"), item.get("dosage"),
              item.get("usage"), qty, price, subtotal),
