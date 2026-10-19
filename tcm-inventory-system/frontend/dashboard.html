@@ -348,7 +348,15 @@ tailwind.config = {
     const LOGS_KEY = 'herb_operation_logs';
     const LOG_RETENTION_DAYS = 365;
     const DEFAULT_WARNING_THRESHOLD = 200;
-    const ACTION_TEXT = { add: '新增药材', edit: '编辑药材', delete: '删除药材' };
+    const ACTION_TEXT = {
+      add: '新增药材', edit: '编辑药材', delete: '删除药材',
+      login: '登录', register: '注册申请',
+      user_add: '新增用户', user_edit: '编辑用户', user_delete: '删除用户',
+      user_approve: '审核通过', user_reject: '驳回注册', user_toggle: '启用/禁用',
+      supplier_add: '新增供应商', supplier_edit: '编辑供应商', supplier_delete: '删除供应商',
+      po_create: '创建采购单', po_audit: '审核采购单', po_in_stock: '采购入库', po_delete: '删除采购单',
+      rx_create: '新建处方', rx_audit: '审核处方', rx_dispense: '处方发药', rx_delete: '删除处方'
+    };
 
     // 日志与药材统一缓存（由后端 /api/dashboard 一次性加载）
     let ALL_LOGS = [];
@@ -607,7 +615,7 @@ tailwind.config = {
       // 提取库存数据点
       const dataPoints = [];
       logs.forEach(log => {
-        const qtyChange = (log.changes || []).find(c => c.field === 'quantity');
+        const qtyChange = log.changes && typeof log.changes === 'object' && !Array.isArray(log.changes) ? log.changes.quantity : undefined;
         if (qtyChange) {
           if (log.action === 'add' && qtyChange.newValue !== null && qtyChange.newValue !== undefined) {
             dataPoints.push({ time: log.timestamp, timeStr: log.timeStr, qty: Number(qtyChange.newValue) });
@@ -756,17 +764,31 @@ tailwind.config = {
         `;
       } else {
         container.innerHTML = `<div class="log-timeline">${logs.map(log => {
-          const changesHtml = (log.changes || [])
-            .filter(c => log.action !== 'add' || c.field === 'quantity')
-            .map(c => {
-              const isQty = c.field === 'quantity';
+          let changesHtml = '';
+          const ch = log.changes && typeof log.changes === 'object' && !Array.isArray(log.changes) ? log.changes : null;
+          if (Array.isArray(log.changes)) {
+            changesHtml = log.changes
+              .filter(c => log.action !== 'add' || c.field === 'quantity')
+              .map(c => {
+                const isQty = c.field === 'quantity';
+                return `<div class="log-change ${isQty ? 'bg-yellow-50 border-l-2 border-yellow-400' : ''}">
+                  <i class="fa ${isQty ? 'fa-cubes' : 'fa-pencil'} text-xs mr-1"></i>
+                  <span class="font-medium">${c.label || c.field}：</span>
+                  ${c.oldValue !== null && c.oldValue !== undefined ? `<span class="old">${c.oldValue}</span> → ` : ''}
+                  <span class="new">${c.newValue !== null && c.newValue !== undefined ? c.newValue : '已删除'}</span>
+                </div>`;
+              }).join('');
+          } else if (ch) {
+            const entries = Object.entries(ch).filter(([k]) => k !== 'summary' && ch[k] !== null && ch[k] !== undefined && ch[k] !== '');
+            changesHtml = entries.slice(0, 4).map(([k, v]) => {
+              const isQty = k === 'quantity';
+              const val = typeof v === 'object' ? JSON.stringify(v) : String(v);
               return `<div class="log-change ${isQty ? 'bg-yellow-50 border-l-2 border-yellow-400' : ''}">
                 <i class="fa ${isQty ? 'fa-cubes' : 'fa-pencil'} text-xs mr-1"></i>
-                <span class="font-medium">${c.label || c.field}：</span>
-                ${c.oldValue !== null && c.oldValue !== undefined ? `<span class="old">${c.oldValue}</span> → ` : ''}
-                <span class="new">${c.newValue !== null && c.newValue !== undefined ? c.newValue : '已删除'}</span>
+                <span class="font-medium">${k}：</span><span class="new">${val.length > 50 ? val.slice(0, 50) + '…' : val}</span>
               </div>`;
             }).join('');
+          }
 
           const actionIcon = log.action === 'add' ? 'fa-plus-circle text-green-600' :
                              log.action === 'edit' ? 'fa-edit text-blue-600' : 'fa-trash text-red-600';

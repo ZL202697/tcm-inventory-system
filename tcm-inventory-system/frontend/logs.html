@@ -41,6 +41,13 @@
         .role-badge.admin { background: #fefcbf; color: #975a16; }
         .content { flex: 1; padding: 16px; }
         @media (min-width: 768px) { .content { padding: 24px; } }
+        .badge-add{background:#d1fae5;color:#065f46}
+        .badge-edit{background:#dbeafe;color:#1e40af}
+        .badge-delete{background:#fee2e2;color:#991b1b}
+        .badge-login,.badge-register,.badge-user{background:#e0e7ff;color:#3730a3}
+        .badge-supplier{background:#fef3c7;color:#92400e}
+        .badge-po{background:#cffafe;color:#155e75}
+        .badge-rx{background:#fce7f3;color:#9d174d}
     </style>
 
 
@@ -108,7 +115,7 @@
         <div class="flex justify-between items-center">
           <div>
             <h2 class="text-2xl font-bold text-gray-800">操作日志</h2>
-            <p class="text-sm text-gray-500 mt-1">记录所有药材的新增、编辑、删除操作，日志最长保留1年</p>
+            <p class="text-sm text-gray-500 mt-1">记录登录、用户、药材、处方、采购、供应商等全部关键操作，日志最长保留1年</p>
           </div>
           <div class="flex items-center gap-2 text-sm text-gray-500">
             <i class="fa fa-database"></i>
@@ -128,9 +135,28 @@
             </select>
             <select id="filter-action" class="filter-select">
               <option value="">全部操作</option>
-              <option value="add">新增</option>
-              <option value="edit">编辑</option>
-              <option value="delete">删除</option>
+              <option value="login">登录</option>
+              <option value="register">注册申请</option>
+              <option value="add">新增药材</option>
+              <option value="edit">编辑药材</option>
+              <option value="delete">删除药材</option>
+              <option value="rx_create">新建处方</option>
+              <option value="rx_audit">审核处方</option>
+              <option value="rx_dispense">处方发药</option>
+              <option value="rx_delete">删除处方</option>
+              <option value="po_create">创建采购单</option>
+              <option value="po_audit">审核采购单</option>
+              <option value="po_in_stock">采购入库</option>
+              <option value="po_delete">删除采购单</option>
+              <option value="supplier_add">新增供应商</option>
+              <option value="supplier_edit">编辑供应商</option>
+              <option value="supplier_delete">删除供应商</option>
+              <option value="user_add">新增用户</option>
+              <option value="user_edit">编辑用户</option>
+              <option value="user_delete">删除用户</option>
+              <option value="user_approve">审核通过</option>
+              <option value="user_reject">驳回注册</option>
+              <option value="user_toggle">启用/禁用</option>
             </select>
             <select id="filter-time" class="filter-select">
               <option value="">全部时间</option>
@@ -235,12 +261,31 @@ tailwind.config = {
 
     const LOGS_KEY = 'herb_operation_logs';
     const LOG_RETENTION_DAYS = 365;
-    const ACTION_TEXT = { add: '新增药材', edit: '编辑药材', delete: '删除药材' };
-    const ACTION_BADGE = { add: 'badge-add', edit: 'badge-edit', delete: 'badge-delete' };
+    const ACTION_TEXT = {
+      add: '新增药材', edit: '编辑药材', delete: '删除药材',
+      login: '登录', register: '注册申请',
+      user_add: '新增用户', user_edit: '编辑用户', user_delete: '删除用户',
+      user_approve: '审核通过', user_reject: '驳回注册', user_toggle: '启用/禁用',
+      supplier_add: '新增供应商', supplier_edit: '编辑供应商', supplier_delete: '删除供应商',
+      po_create: '创建采购单', po_audit: '审核采购单', po_in_stock: '采购入库', po_delete: '删除采购单',
+      rx_create: '新建处方', rx_audit: '审核处方', rx_dispense: '处方发药', rx_delete: '删除处方'
+    };
+    const ACTION_BADGE = {
+      add: 'badge-add', edit: 'badge-edit', delete: 'badge-delete',
+      login: 'badge-login', register: 'badge-register',
+      user_add: 'badge-user', user_edit: 'badge-user', user_delete: 'badge-user',
+      user_approve: 'badge-user', user_reject: 'badge-user', user_toggle: 'badge-user',
+      supplier_add: 'badge-supplier', supplier_edit: 'badge-supplier', supplier_delete: 'badge-supplier',
+      po_create: 'badge-po', po_audit: 'badge-po', po_in_stock: 'badge-po', po_delete: 'badge-po',
+      rx_create: 'badge-rx', rx_audit: 'badge-rx', rx_dispense: 'badge-rx', rx_delete: 'badge-rx'
+    };
     const FIELD_LABELS = {
       name: '药材名称', category: '类别', origin: '产地', storage: '储存条件',
       unit: '单位', price: '单价', quantity: '库存数量', description: '描述',
-      warningThreshold: '预警阈值'
+      warningThreshold: '预警阈值',
+      username: '用户名', role: '角色', phone: '电话', status: '状态',
+      contactPerson: '联系人', address: '地址', supplierName: '供应商',
+      orderNo: '单号', patientName: '患者', totalAmount: '总额'
     };
 
     // 日志统一从后端 MySQL 获取，前端不再使用 localStorage
@@ -312,7 +357,7 @@ tailwind.config = {
       } catch (e) {}
       try {
         const logs = await api('GET', '/api/logs');
-        logs.forEach(l => herbNames.add(l.herbName));
+        logs.forEach(l => { if (l.herbName) herbNames.add(l.herbName); });
       } catch (e) {}
       const select = document.getElementById('filter-herb');
       Array.from(herbNames).sort().forEach(name => {
@@ -321,6 +366,10 @@ tailwind.config = {
         opt.textContent = name;
         select.appendChild(opt);
       });
+    }
+
+    function esc(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
 
     async function renderLogs() {
@@ -353,17 +402,37 @@ tailwind.config = {
 
       emptyState.classList.add('hidden');
       timeline.innerHTML = logs.map(log => {
-        const changesHtml = (log.changes || [])
-          .filter(c => c.field !== 'description' || log.action !== 'add')
-          .map(c => {
-            const isQty = c.field === 'quantity';
-            return `<div class="log-change ${isQty ? 'quantity-change' : ''}">
-              <i class="fa ${isQty ? 'fa-cubes' : 'fa-pencil'} text-xs mr-1"></i>
-              <span class="font-medium">${c.label || c.field}：</span>
-              ${c.oldValue !== null && c.oldValue !== undefined ? `<span class="old">${c.oldValue}</span> → ` : ''}
-              <span class="new">${c.newValue !== null && c.newValue !== undefined ? c.newValue : '已删除'}</span>
+        const ch = log.changes && typeof log.changes === 'object' && !Array.isArray(log.changes) ? log.changes : null;
+        let changesHtml = '';
+        if (Array.isArray(log.changes)) {
+          changesHtml = log.changes
+            .filter(c => c.field !== 'description' || log.action !== 'add')
+            .map(c => {
+              const isQty = c.field === 'quantity';
+              return `<div class="log-change ${isQty ? 'quantity-change' : ''}">
+                <i class="fa ${isQty ? 'fa-cubes' : 'fa-pencil'} text-xs mr-1"></i>
+                <span class="font-medium">${esc(c.label || c.field)}：</span>
+                ${c.oldValue !== null && c.oldValue !== undefined ? `<span class="old">${esc(c.oldValue)}</span> → ` : ''}
+                <span class="new">${c.newValue !== null && c.newValue !== undefined ? esc(c.newValue) : '已删除'}</span>
+              </div>`;
+            }).join('');
+        } else if (ch) {
+          const entries = Object.entries(ch).filter(([k]) => k !== 'summary' && ch[k] !== null && ch[k] !== undefined && ch[k] !== '');
+          const detailLines = entries.slice(0, 5).map(([k, v]) => {
+            const val = typeof v === 'object' ? JSON.stringify(v) : String(v);
+            const label = FIELD_LABELS[k] || k;
+            return `<div class="log-change">
+              <i class="fa fa-pencil text-xs mr-1"></i>
+              <span class="font-medium">${esc(label)}：</span>
+              <span class="new">${esc(val.length > 60 ? val.slice(0, 60) + '…' : val)}</span>
             </div>`;
           }).join('');
+          changesHtml = detailLines;
+        }
+        const targetHtml = log.herbName
+          ? `<span class="font-medium text-gray-800">${esc(log.herbName)}</span><span class="text-xs text-gray-400"> (${esc(log.herbCode || '')})</span>`
+          : (ch && ch.summary ? `<span class="font-medium text-gray-800">${esc(ch.summary)}</span>` : '');
+        const actionIcon = ({ add: 'fa-plus', edit: 'fa-edit', delete: 'fa-trash', login: 'fa-sign-in-alt', register: 'fa-user-plus', user_add: 'fa-user-plus', user_edit: 'fa-user-edit', user_delete: 'fa-user-times', user_approve: 'fa-check-circle', user_reject: 'fa-times-circle', user_toggle: 'fa-toggle-on', supplier_add: 'fa-plus', supplier_edit: 'fa-pen', supplier_delete: 'fa-trash', po_create: 'fa-file-invoice', po_audit: 'fa-check-circle', po_in_stock: 'fa-warehouse', po_delete: 'fa-trash', rx_create: 'fa-file-prescription', rx_audit: 'fa-check-circle', rx_dispense: 'fa-pills', rx_delete: 'fa-trash' })[log.action] || 'fa-circle';
 
         return `
           <div class="log-item action-${log.action}">
@@ -371,16 +440,15 @@ tailwind.config = {
               <div class="flex items-center justify-between mb-2">
                 <div class="flex items-center gap-2">
                   <span class="px-2 py-1 rounded-full text-xs font-medium ${ACTION_BADGE[log.action] || ''}">
-                    <i class="fa ${log.action === 'add' ? 'fa-plus' : log.action === 'edit' ? 'fa-edit' : 'fa-trash'} mr-1"></i>
+                    <i class="fa ${actionIcon} mr-1"></i>
                     ${ACTION_TEXT[log.action] || log.action}
                   </span>
-                  <span class="font-medium text-gray-800">${log.herbName}</span>
-                  <span class="text-xs text-gray-400">(${log.herbCode})</span>
+                  ${targetHtml}
                 </div>
-                <span class="text-xs text-gray-400"><i class="fa fa-clock-o mr-1"></i>${log.timeStr}</span>
+                <span class="text-xs text-gray-400"><i class="fa fa-clock-o mr-1"></i>${esc(log.timeStr)}</span>
               </div>
               <div class="text-xs text-gray-500 mb-1">
-                <i class="fa fa-user mr-1"></i>操作人：${log.operatorName || log.operator}（${log.operator}）
+                <i class="fa fa-user mr-1"></i>操作人：${esc(log.operatorName || log.operator)}（${esc(log.operator)}）
               </div>
               ${changesHtml}
             </div>
