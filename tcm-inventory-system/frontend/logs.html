@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>操作日志 - 本草智管平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f7fa; }
+        .sidebar { width: 240px; background: linear-gradient(180deg, #1a365d 0%, #2c5282 100%); min-height: 100vh; position: fixed; left: 0; top: 0; color: white; overflow-y: auto; z-index: 40; transform: translateX(-100%); transition: transform 0.3s ease; }
+        .sidebar.open { transform: translateX(0); }
+        @media (min-width: 768px) { .sidebar { transform: translateX(0); position: fixed; } }
+        .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 35; }
+        .sidebar-overlay.show { display: block; }
+        .sidebar-brand { padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .sidebar-brand h1 { font-size: 18px; font-weight: 600; }
+        .sidebar-brand p { font-size: 12px; opacity: 0.7; margin-top: 4px; }
+        .nav-item { display: flex; align-items: center; padding: 12px 20px; color: rgba(255,255,255,0.8); text-decoration: none; transition: all 0.2s; cursor: pointer; }
+        .nav-item:hover { background: rgba(255,255,255,0.1); color: white; }
+        .nav-item.active { background: rgba(255,255,255,0.15); color: white; border-left: 3px solid #68d391; }
+        .nav-item i { width: 20px; margin-right: 12px; }
+        .nav-section { padding: 16px 20px 8px; font-size: 11px; text-transform: uppercase; opacity: 0.5; letter-spacing: 1px; }
+        .main { margin-left: 0; min-height: 100vh; display: flex; flex-direction: column; }
+        @media (min-width: 768px) { .main { margin-left: 240px; } }
+        .topbar { background: white; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: sticky; top: 0; z-index: 30; }
+        @media (min-width: 768px) { .topbar { padding: 12px 24px; } }
+        .topbar h2 { font-size: 16px; font-weight: 600; color: #2d3748; display: flex; align-items: center; gap: 8px; }
+        @media (min-width: 768px) { .topbar h2 { font-size: 18px; } }
+        .menu-btn { background: none; border: none; font-size: 20px; color: #2d3748; cursor: pointer; padding: 4px 8px; }
+        @media (min-width: 768px) { .menu-btn { display: none; } }
+        .user-info { display: flex; align-items: center; gap: 8px; }
+        @media (min-width: 768px) { .user-info { gap: 12px; } }
+        .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #68d391, #38a169); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 14px; }
+        @media (min-width: 768px) { .user-avatar { width: 36px; height: 36px; } }
+        .role-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 500; }
+        @media (min-width: 768px) { .role-badge { font-size: 11px; } }
+        .role-badge.doctor { background: #bee3f8; color: #2c5282; }
+        .role-badge.admin { background: #fefcbf; color: #975a16; }
+        .content { flex: 1; padding: 16px; }
+        @media (min-width: 768px) { .content { padding: 24px; } }
+    </style>
+
+
+    <!-- PWA 支持 -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1a365d">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="本草智管">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <link rel="icon" type="image/x-icon" href="/icons/favicon.ico">
+
+</head>
+<body>
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <div class="sidebar" id="sidebar">
+
+        <div class="sidebar-brand">
+          <h1><i class="fas fa-leaf"></i> 本草智管</h1>
+          <p>中医门诊药材库存管理系统</p>
+        </div>
+        <div id="nav-menu">
+          <div class="nav-section">核心功能</div>
+          <div class="nav-item" onclick="location.href='dashboard.html'"><i class="fas fa-tachometer-alt"></i>控制面板</div>
+          <div class="nav-item" onclick="location.href='prescriptions.html'"><i class="fas fa-file-prescription"></i>处方管理</div>
+          <div class="nav-item" onclick="location.href='data-board.html'"><i class="fas fa-chart-bar"></i>数据看板</div>
+          <div class="nav-section">库存管理</div>
+          <div class="nav-item" onclick="location.href='herbs.html'"><i class="fas fa-boxes"></i>药材管理</div>
+          <div class="nav-item" onclick="location.href='purchase.html'"><i class="fas fa-truck-loading"></i>采购管理</div>
+          <div class="nav-item" onclick="location.href='replenish.html'"><i class="fas fa-bell"></i>库存预警/补货</div>
+          <div class="nav-item" onclick="location.href='stock-flow.html'"><i class="fas fa-exchange-alt"></i>库存流水</div>
+          <div class="nav-section">系统管理</div>
+          <div class="nav-item" onclick="location.href='users.html'"><i class="fas fa-users"></i>用户管理</div>
+          <div class="nav-item" onclick="location.href='logs.html'"><i class="fas fa-history"></i>操作日志</div>
+          <div class="nav-item" onclick="logout()"><i class="fas fa-sign-out-alt"></i>退出登录</div>
+        </div>
+
+    </div>
+
+    <div class="main">
+        <div class="topbar">
+            <div style="display:flex;align-items:center;gap:8px;">
+                <button class="menu-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                <h2><i class="fas fa-history" style="color:#68d391;"></i> 操作日志</h2>
+            </div>
+            <div class="user-info">
+                <span id="topbar-role-badge" class="role-badge"></span>
+                <span id="topbar-username" style="font-size:13px;color:#4a5568;"></span>
+                <div class="user-avatar" id="topbar-avatar"></div>
+            </div>
+        </div>
+
+        <!-- 兼容层：旧布局元素的隐藏占位，防止原JS报错 -->
+        <div style="display:none;">
+            <button id="sidebar-toggle"></button>
+            <span id="welcome-message"></span>
+            <p id="sidebar-username"></p>
+            <p id="sidebar-role"></p>
+            <button id="logout-btn" onclick="logout()"></button>
+            <nav id="sidebar-nav"></nav>
+        </div>
+
+        <div class="content">
+<div class="space-y-6">
+        <div class="flex justify-between items-center">
+          <div>
+            <h2 class="text-2xl font-bold text-gray-800">操作日志</h2>
+            <p class="text-sm text-gray-500 mt-1">记录所有药材的新增、编辑、删除操作，日志最长保留1年</p>
+          </div>
+          <div class="flex items-center gap-2 text-sm text-gray-500">
+            <i class="fa fa-database"></i>
+            <span>共 <span id="log-total-count" class="font-bold text-primary">0</span> 条记录</span>
+          </div>
+        </div>
+
+        <!-- 筛选栏 -->
+        <div class="bg-white rounded-xl p-4 shadow-md">
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="flex items-center gap-2">
+              <i class="fa fa-filter text-gray-400"></i>
+              <span class="text-sm text-gray-600">筛选：</span>
+            </div>
+            <select id="filter-herb" class="filter-select min-w-[160px]">
+              <option value="">全部药材</option>
+            </select>
+            <select id="filter-action" class="filter-select">
+              <option value="">全部操作</option>
+              <option value="add">新增</option>
+              <option value="edit">编辑</option>
+              <option value="delete">删除</option>
+            </select>
+            <select id="filter-time" class="filter-select">
+              <option value="">全部时间</option>
+              <option value="today">今天</option>
+              <option value="week">近7天</option>
+              <option value="month">近30天</option>
+              <option value="quarter">近90天</option>
+            </select>
+            <div class="flex-1"></div>
+            <input type="text" id="search-input" class="filter-select flex-1 min-w-[200px]" placeholder="搜索操作人或变更内容...">
+            <button id="reset-filter" class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+              <i class="fa fa-refresh mr-1"></i> 重置
+            </button>
+          </div>
+        </div>
+
+        <!-- 日志列表 -->
+        <div class="bg-white rounded-xl p-6 shadow-md">
+          <div id="log-empty-state" class="flex flex-col items-center justify-center py-16 hidden">
+            <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 mb-4">
+              <i class="fa fa-history text-4xl"></i>
+            </div>
+            <h3 class="text-lg font-medium text-gray-700 mb-2">暂无日志记录</h3>
+            <p class="text-gray-400 text-sm">没有符合筛选条件的操作记录</p>
+          </div>
+          <div id="log-timeline" class="log-timeline"></div>
+        </div>
+      </div>
+        </div>
+    </div>
+
+    <script>
+
+    // ===== 统一布局工具函数 =====
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('sidebar-overlay').classList.toggle('show');
+    }
+    function logout() {
+      sessionStorage.removeItem('current_user');
+      sessionStorage.removeItem('current_role');
+      sessionStorage.removeItem('current_name');
+      window.location.href = 'index.html';
+    }
+    function initUnifiedLayout(pageName) {
+      const currentUser = sessionStorage.getItem('current_user');
+      const currentRole = sessionStorage.getItem('current_role');
+      const currentName = sessionStorage.getItem('current_name') || currentUser;
+      if (!currentUser) { window.location.href = 'index.html'; return; }
+      const roleText = { admin: '管理员', doctor: '医生' };
+      const userNameEl = document.getElementById('topbar-username');
+      const userAvatarEl = document.getElementById('topbar-avatar');
+      const roleBadgeEl = document.getElementById('topbar-role-badge');
+      if (userNameEl) userNameEl.textContent = currentName;
+      if (userAvatarEl) userAvatarEl.textContent = currentName.charAt(0);
+      if (roleBadgeEl) {
+        roleBadgeEl.className = 'role-badge ' + currentRole;
+        roleBadgeEl.textContent = roleText[currentRole] || currentRole;
+      }
+      document.querySelectorAll('.nav-item').forEach(item => {
+        if (item.textContent.includes(pageName)) item.classList.add('active');
+      });
+      const rolePermissions = {
+        doctor: ['控制面板', '处方管理', '数据看板', '药材管理', '采购管理', '库存预警/补货', '库存流水', '退出登录'],
+        admin: ['控制面板', '处方管理', '数据看板', '药材管理', '采购管理', '库存预警/补货', '库存流水', '用户管理', '操作日志', '退出登录'],
+      };
+      const allowed = rolePermissions[currentRole] || [];
+      document.querySelectorAll('.nav-item').forEach(item => {
+        const text = item.textContent.trim();
+        if (!allowed.some(a => text.includes(a))) item.style.display = 'none';
+      });
+    }
+
+
+// ===== 原页面业务逻辑 =====
+tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#2E7D32',
+            secondary: '#8D6E63',
+            accent: '#D32F2F',
+            neutral: '#F5F5F5',
+          }
+        }
+      }
+    }
+
+// ===== 后端 API 辅助层 =====
+    const API_BASE = '';
+    async function api(method, url, body) {
+      const opts = { method: method, headers: { 'Content-Type': 'application/json', 'X-User': sessionStorage.getItem('current_user') || '' } };
+      if (body !== undefined) opts.body = JSON.stringify(body);
+      const resp = await fetch(API_BASE + url, opts);
+      const result = await resp.json().catch(() => ({ code: -1, message: '服务器连接失败' }));
+      if (result.code !== 0) {
+        alert(result.message);
+        throw new Error(result.message);
+      }
+      return result.data;
+    }
+
+    const LOGS_KEY = 'herb_operation_logs';
+    const LOG_RETENTION_DAYS = 365;
+    const ACTION_TEXT = { add: '新增药材', edit: '编辑药材', delete: '删除药材' };
+    const ACTION_BADGE = { add: 'badge-add', edit: 'badge-edit', delete: 'badge-delete' };
+    const FIELD_LABELS = {
+      name: '药材名称', category: '类别', origin: '产地', storage: '储存条件',
+      unit: '单位', price: '单价', quantity: '库存数量', description: '描述',
+      warningThreshold: '预警阈值'
+    };
+
+    // 日志统一从后端 MySQL 获取，前端不再使用 localStorage
+    function getLogs() { return []; }
+    function cleanupOldLogs() { return []; }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      cleanupOldLogs();
+
+      document.getElementById('sidebar-toggle').addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('-translate-x-full');
+      });
+
+      const currentUser = sessionStorage.getItem('current_user');
+      const currentRole = sessionStorage.getItem('current_role');
+      const currentName = sessionStorage.getItem('current_name') || currentUser;
+      if (!currentUser) window.location.href = 'index.html';
+
+      // 非管理员无权限查看日志
+      if (currentRole !== 'admin') {
+        alert('您没有权限查看操作日志');
+        window.location.href = 'dashboard.html';
+        return;
+      }
+
+      const roleText = { admin: '管理员', doctor: '医生' };
+      document.getElementById('welcome-message').textContent = `欢迎，${currentName}`;
+      document.getElementById('sidebar-username').textContent = currentName;
+      document.getElementById('sidebar-role').textContent = roleText[currentRole] || '用户';
+
+      document.querySelectorAll('#sidebar-nav > a').forEach(item => {
+        const allowedRoles = item.dataset.role.split(',');
+        if (!allowedRoles.includes(currentRole)) item.classList.add('hidden');
+      });
+
+      // 初始化药材筛选下拉
+      initHerbFilter();
+
+      // 绑定筛选事件
+      document.getElementById('filter-herb').addEventListener('change', renderLogs);
+      document.getElementById('filter-action').addEventListener('change', renderLogs);
+      document.getElementById('filter-time').addEventListener('change', renderLogs);
+      document.getElementById('search-input').addEventListener('input', renderLogs);
+      document.getElementById('reset-filter').addEventListener('click', () => {
+        document.getElementById('filter-herb').value = '';
+        document.getElementById('filter-action').value = '';
+        document.getElementById('filter-time').value = '';
+        document.getElementById('search-input').value = '';
+        renderLogs();
+      });
+
+      // 退出登录
+      document.getElementById('logout-btn').addEventListener('click', () => {
+        sessionStorage.removeItem('current_user');
+        sessionStorage.removeItem('current_role');
+        sessionStorage.removeItem('current_name');
+        sessionStorage.removeItem('stock_warning_shown');
+        window.location.href = 'index.html';
+      });
+
+      renderLogs();
+    });
+
+    async function initHerbFilter() {
+      const herbNames = new Set();
+      try {
+        const herbs = await api('GET', '/api/herbs');
+        herbs.forEach(h => herbNames.add(h.name));
+      } catch (e) {}
+      try {
+        const logs = await api('GET', '/api/logs');
+        logs.forEach(l => herbNames.add(l.herbName));
+      } catch (e) {}
+      const select = document.getElementById('filter-herb');
+      Array.from(herbNames).sort().forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        select.appendChild(opt);
+      });
+    }
+
+    async function renderLogs() {
+      const filterHerb = document.getElementById('filter-herb').value;
+      const filterAction = document.getElementById('filter-action').value;
+      const filterTime = document.getElementById('filter-time').value;
+      const searchKw = document.getElementById('search-input').value.trim().toLowerCase();
+
+      // 后端按筛选条件查询日志
+      const params = new URLSearchParams();
+      if (filterHerb) params.set('herb', filterHerb);
+      if (filterAction) params.set('action', filterAction);
+      if (filterTime) params.set('time', filterTime);
+      if (searchKw) params.set('keyword', searchKw);
+      let logs = await api('GET', '/api/logs?' + params.toString());
+
+      // 按时间倒序
+      logs.sort((a, b) => b.timestamp - a.timestamp);
+
+      document.getElementById('log-total-count').textContent = logs.length;
+
+      const timeline = document.getElementById('log-timeline');
+      const emptyState = document.getElementById('log-empty-state');
+
+      if (logs.length === 0) {
+        timeline.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+      timeline.innerHTML = logs.map(log => {
+        const changesHtml = (log.changes || [])
+          .filter(c => c.field !== 'description' || log.action !== 'add')
+          .map(c => {
+            const isQty = c.field === 'quantity';
+            return `<div class="log-change ${isQty ? 'quantity-change' : ''}">
+              <i class="fa ${isQty ? 'fa-cubes' : 'fa-pencil'} text-xs mr-1"></i>
+              <span class="font-medium">${c.label || c.field}：</span>
+              ${c.oldValue !== null && c.oldValue !== undefined ? `<span class="old">${c.oldValue}</span> → ` : ''}
+              <span class="new">${c.newValue !== null && c.newValue !== undefined ? c.newValue : '已删除'}</span>
+            </div>`;
+          }).join('');
+
+        return `
+          <div class="log-item action-${log.action}">
+            <div class="log-card">
+              <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-1 rounded-full text-xs font-medium ${ACTION_BADGE[log.action] || ''}">
+                    <i class="fa ${log.action === 'add' ? 'fa-plus' : log.action === 'edit' ? 'fa-edit' : 'fa-trash'} mr-1"></i>
+                    ${ACTION_TEXT[log.action] || log.action}
+                  </span>
+                  <span class="font-medium text-gray-800">${log.herbName}</span>
+                  <span class="text-xs text-gray-400">(${log.herbCode})</span>
+                </div>
+                <span class="text-xs text-gray-400"><i class="fa fa-clock-o mr-1"></i>${log.timeStr}</span>
+              </div>
+              <div class="text-xs text-gray-500 mb-1">
+                <i class="fa fa-user mr-1"></i>操作人：${log.operatorName || log.operator}（${log.operator}）
+              </div>
+              ${changesHtml}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+// ===== 初始化统一布局 =====
+initUnifiedLayout("操作日志");
+    </script>
+
+    <!-- PWA Service Worker 注册 -->
+    <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('/sw.js')
+                .then(function(registration) {
+                    console.log('PWA: Service Worker 注册成功，范围:', registration.scope);
+                    
+                    // 监听更新
+                    registration.addEventListener('updatefound', function() {
+                        const newWorker = registration.installing;
+                        newWorker.addEventListener('statechange', function() {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                // 显示更新提示
+                                if (confirm('发现新版本，是否立即更新？')) {
+                                    newWorker.postMessage('SKIP_WAITING');
+                                    location.reload();
+                                }
+                            }
+                        });
+                    });
+                })
+                .catch(function(error) {
+                    console.log('PWA: Service Worker 注册失败:', error);
+                });
+        });
+    }
+    
+    // PWA 安装提示
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        console.log('PWA: 可以安装应用');
+        
+        // 显示安装按钮（如果有安装按钮元素）
+        const installBtn = document.getElementById('pwa-install-btn');
+        if (installBtn) {
+            installBtn.style.display = 'flex';
+            installBtn.addEventListener('click', function() {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    deferredPrompt.userChoice.then(function(choiceResult) {
+                        if (choiceResult.outcome === 'accepted') {
+                            console.log('PWA: 用户接受安装');
+                        }
+                        deferredPrompt = null;
+                        installBtn.style.display = 'none';
+                    });
+                }
+            });
+        }
+    });
+    
+    window.addEventListener('appinstalled', function() {
+        console.log('PWA: 应用已安装');
+        const installBtn = document.getElementById('pwa-install-btn');
+        if (installBtn) {
+            installBtn.style.display = 'none';
+        }
+    });
+    </script>
+
+</body>
+</html>

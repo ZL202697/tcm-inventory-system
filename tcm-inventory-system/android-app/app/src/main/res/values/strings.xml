@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">本草智管</string>
+    <string name="app_full_name">中医门诊药材库存管理系统</string>
+    <string name="version_name">5.0.0</string>
+</resources>

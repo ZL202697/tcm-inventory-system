@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>库存流水 - 本草智管平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f7fa; }
+        .sidebar { width: 240px; background: linear-gradient(180deg, #1a365d 0%, #2c5282 100%); min-height: 100vh; position: fixed; left: 0; top: 0; color: white; overflow-y: auto; z-index: 40; transform: translateX(-100%); transition: transform 0.3s ease; }
+        .sidebar.open { transform: translateX(0); }
+        @media (min-width: 768px) { .sidebar { transform: translateX(0); position: fixed; } }
+        .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 35; }
+        .sidebar-overlay.show { display: block; }
+        .sidebar-brand { padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .sidebar-brand h1 { font-size: 18px; font-weight: 600; }
+        .sidebar-brand p { font-size: 12px; opacity: 0.7; margin-top: 4px; }
+        .nav-item { display: flex; align-items: center; padding: 12px 20px; color: rgba(255,255,255,0.8); text-decoration: none; transition: all 0.2s; cursor: pointer; }
+        .nav-item:hover { background: rgba(255,255,255,0.1); color: white; }
+        .nav-item.active { background: rgba(255,255,255,0.15); color: white; border-left: 3px solid #68d391; }
+        .nav-item i { width: 20px; margin-right: 12px; }
+        .nav-section { padding: 16px 20px 8px; font-size: 11px; text-transform: uppercase; opacity: 0.5; letter-spacing: 1px; }
+        .main { margin-left: 0; min-height: 100vh; display: flex; flex-direction: column; }
+        @media (min-width: 768px) { .main { margin-left: 240px; } }
+        .topbar { background: white; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: sticky; top: 0; z-index: 30; }
+        @media (min-width: 768px) { .topbar { padding: 12px 24px; } }
+        .topbar h2 { font-size: 16px; font-weight: 600; color: #2d3748; display: flex; align-items: center; gap: 8px; }
+        @media (min-width: 768px) { .topbar h2 { font-size: 18px; } }
+        .menu-btn { background: none; border: none; font-size: 20px; color: #2d3748; cursor: pointer; padding: 4px 8px; }
+        @media (min-width: 768px) { .menu-btn { display: none; } }
+        .user-info { display: flex; align-items: center; gap: 8px; }
+        @media (min-width: 768px) { .user-info { gap: 12px; } }
+        .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #68d391, #38a169); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 14px; }
+        @media (min-width: 768px) { .user-avatar { width: 36px; height: 36px; } }
+        .role-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 500; }
+        @media (min-width: 768px) { .role-badge { font-size: 11px; } }
+        .role-badge.doctor { background: #bee3f8; color: #2c5282; }
+        .role-badge.admin { background: #fefcbf; color: #975a16; }
+        .content { flex: 1; padding: 16px; }
+        @media (min-width: 768px) { .content { padding: 24px; } }
+    </style>
+
+
+    <!-- PWA 支持 -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1a365d">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="本草智管">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <link rel="icon" type="image/x-icon" href="/icons/favicon.ico">
+
+</head>
+<body>
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <div class="sidebar" id="sidebar">
+
+        <div class="sidebar-brand">
+          <h1><i class="fas fa-leaf"></i> 本草智管</h1>
+          <p>中医门诊药材库存管理系统</p>
+        </div>
+        <div id="nav-menu">
+          <div class="nav-section">核心功能</div>
+          <div class="nav-item" onclick="location.href='dashboard.html'"><i class="fas fa-tachometer-alt"></i>控制面板</div>
+          <div class="nav-item" onclick="location.href='prescriptions.html'"><i class="fas fa-file-prescription"></i>处方管理</div>
+          <div class="nav-item" onclick="location.href='data-board.html'"><i class="fas fa-chart-bar"></i>数据看板</div>
+          <div class="nav-section">库存管理</div>
+          <div class="nav-item" onclick="location.href='herbs.html'"><i class="fas fa-boxes"></i>药材管理</div>
+          <div class="nav-item" onclick="location.href='purchase.html'"><i class="fas fa-truck-loading"></i>采购管理</div>
+          <div class="nav-item" onclick="location.href='replenish.html'"><i class="fas fa-bell"></i>库存预警/补货</div>
+          <div class="nav-item" onclick="location.href='stock-flow.html'"><i class="fas fa-exchange-alt"></i>库存流水</div>
+          <div class="nav-section">系统管理</div>
+          <div class="nav-item" onclick="location.href='users.html'"><i class="fas fa-users"></i>用户管理</div>
+          <div class="nav-item" onclick="location.href='logs.html'"><i class="fas fa-history"></i>操作日志</div>
+          <div class="nav-item" onclick="logout()"><i class="fas fa-sign-out-alt"></i>退出登录</div>
+        </div>
+
+    </div>
+
+    <div class="main">
+        <div class="topbar">
+            <div style="display:flex;align-items:center;gap:8px;">
+                <button class="menu-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                <h2><i class="fas fa-exchange-alt" style="color:#68d391;"></i> 库存流水</h2>
+            </div>
+            <div class="user-info">
+                <span id="topbar-role-badge" class="role-badge"></span>
+                <span id="topbar-username" style="font-size:13px;color:#4a5568;"></span>
+                <div class="user-avatar" id="topbar-avatar"></div>
+            </div>
+        </div>
+
+        <!-- 兼容层：旧布局元素的隐藏占位，防止原JS报错 -->
+        <div style="display:none;">
+            <button id="sidebar-toggle"></button>
+            <span id="welcome-message"></span>
+            <p id="sidebar-username"></p>
+            <p id="sidebar-role"></p>
+            <button id="logout-btn" onclick="logout()"></button>
+            <nav id="sidebar-nav"></nav>
+        </div>
+
+        <div class="content">
+<div class="space-y-6">
+        <div>
+          <h2 class="text-2xl font-bold text-gray-800">库存流水</h2>
+          <p class="text-gray-500 mt-1">记录所有药材库存变动明细，支持按药材和类型筛选</p>
+        </div>
+
+        <!-- 统计卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="bg-white rounded-xl p-4 shadow-md">
+            <p class="text-sm text-gray-500">总入库量</p>
+            <p class="text-2xl font-bold text-green-600 mt-1"><i class="fa fa-arrow-down mr-1"></i><span id="stat-total-in">0</span></p>
+          </div>
+          <div class="bg-white rounded-xl p-4 shadow-md">
+            <p class="text-sm text-gray-500">总出库量</p>
+            <p class="text-2xl font-bold text-red-600 mt-1"><i class="fa fa-arrow-up mr-1"></i><span id="stat-total-out">0</span></p>
+          </div>
+          <div class="bg-white rounded-xl p-4 shadow-md">
+            <p class="text-sm text-gray-500">流水记录数</p>
+            <p class="text-2xl font-bold text-blue-600 mt-1"><i class="fa fa-list-alt mr-1"></i><span id="stat-count">0</span></p>
+          </div>
+        </div>
+
+        <!-- 筛选栏 -->
+        <div class="bg-white rounded-xl p-4 shadow-md">
+          <div class="flex flex-wrap items-center gap-4">
+            <div class="flex items-center gap-2">
+              <span class="text-sm text-gray-600">类型：</span>
+              <select id="filter-type" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50">
+                <option value="">全部</option>
+                <option value="in">入库</option>
+                <option value="out">出库</option>
+              </select>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-sm text-gray-600">药材：</span>
+              <select id="filter-herb" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50">
+                <option value="">全部药材</option>
+              </select>
+            </div>
+            <button id="btn-search" class="px-4 py-1.5 bg-primary text-white rounded-lg text-sm hover:bg-green-700 transition-colors">
+              <i class="fa fa-search mr-1"></i> 筛选
+            </button>
+            <button id="btn-reset" class="px-4 py-1.5 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors">
+              <i class="fa fa-refresh mr-1"></i> 重置
+            </button>
+          </div>
+        </div>
+
+        <!-- 流水列表 -->
+        <div class="bg-white rounded-xl shadow-md overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-gray-50 border-b">
+                <tr>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">时间</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">药材</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">类型</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">变动数量</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">变动后库存</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">关联单据</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">备注</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作人</th>
+                </tr>
+              </thead>
+              <tbody id="tx-table-body" class="divide-y divide-gray-200">
+                <tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">加载中...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+        </div>
+    </div>
+
+    <script>
+
+    // ===== 统一布局工具函数 =====
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('sidebar-overlay').classList.toggle('show');
+    }
+    function logout() {
+      sessionStorage.removeItem('current_user');
+      sessionStorage.removeItem('current_role');
+      sessionStorage.removeItem('current_name');
+      window.location.href = 'index.html';
+    }
+    function initUnifiedLayout(pageName) {
+      const currentUser = sessionStorage.getItem('current_user');
+      const currentRole = sessionStorage.getItem('current_role');
+      const currentName = sessionStorage.getItem('current_name') || currentUser;
+      if (!currentUser) { window.location.href = 'index.html'; return; }
+      const roleText = { admin: '管理员', doctor: '医生' };
+      const userNameEl = document.getElementById('topbar-username');
+      const userAvatarEl = document.getElementById('topbar-avatar');
+      const roleBadgeEl = document.getElementById('topbar-role-badge');
+      if (userNameEl) userNameEl.textContent = currentName;
+      if (userAvatarEl) userAvatarEl.textContent = currentName.charAt(0);
+      if (roleBadgeEl) {
+        roleBadgeEl.className = 'role-badge ' + currentRole;
+        roleBadgeEl.textContent = roleText[currentRole] || currentRole;
+      }
+      document.querySelectorAll('.nav-item').forEach(item => {
+        if (item.textContent.includes(pageName)) item.classList.add('active');
+      });
+      const rolePermissions = {
+        doctor: ['控制面板', '处方管理', '数据看板', '药材管理', '采购管理', '库存预警/补货', '库存流水', '退出登录'],
+        admin: ['控制面板', '处方管理', '数据看板', '药材管理', '采购管理', '库存预警/补货', '库存流水', '用户管理', '操作日志', '退出登录'],
+      };
+      const allowed = rolePermissions[currentRole] || [];
+      document.querySelectorAll('.nav-item').forEach(item => {
+        const text = item.textContent.trim();
+        if (!allowed.some(a => text.includes(a))) item.style.display = 'none';
+      });
+    }
+
+
+// ===== 原页面业务逻辑 =====
+tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#2E7D32',
+            secondary: '#8D6E63',
+            accent: '#D32F2F',
+            neutral: '#F5F5F5',
+          }
+        }
+      }
+    }
+
+const API_BASE = '';
+    async function api(method, url, body) {
+      const opts = { method: method, headers: { 'Content-Type': 'application/json', 'X-User': sessionStorage.getItem('current_user') || '' } };
+      if (body !== undefined) opts.body = JSON.stringify(body);
+      const resp = await fetch(API_BASE + url, opts);
+      const result = await resp.json().catch(() => ({ code: -1, message: '服务器连接失败' }));
+      if (result.code !== 0) { alert(result.message); throw new Error(result.message); }
+      return result.data;
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      const currentUser = sessionStorage.getItem('current_user');
+      const currentRole = sessionStorage.getItem('current_role');
+      const currentName = sessionStorage.getItem('current_name') || currentUser;
+      if (!currentUser) window.location.href = 'index.html';
+
+      const roleText = { admin: '管理员', doctor: '医生' };
+      document.getElementById('welcome-message').textContent = `欢迎，${currentName}`;
+      document.getElementById('sidebar-username').textContent = currentName;
+      document.getElementById('sidebar-role').textContent = roleText[currentRole] || '用户';
+
+      document.querySelectorAll('#sidebar-nav > a').forEach(item => {
+        const allowedRoles = item.dataset.role.split(',');
+        if (!allowedRoles.includes(currentRole)) item.classList.add('hidden');
+      });
+
+      document.getElementById('sidebar-toggle').addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('-translate-x-full');
+      });
+      document.getElementById('logout-btn').addEventListener('click', () => {
+        sessionStorage.clear();
+        window.location.href = 'index.html';
+      });
+
+      document.getElementById('btn-search').addEventListener('click', loadTransactions);
+      document.getElementById('btn-reset').addEventListener('click', () => {
+        document.getElementById('filter-type').value = '';
+        document.getElementById('filter-herb').value = '';
+        loadTransactions();
+      });
+
+      // 加载药材列表
+      try {
+        const herbs = await api('GET', '/api/herbs');
+        const sel = document.getElementById('filter-herb');
+        herbs.forEach(h => {
+          const opt = document.createElement('option');
+          opt.value = h.code;
+          opt.textContent = `${h.name} (${h.code})`;
+          sel.appendChild(opt);
+        });
+      } catch (e) { console.error(e); }
+
+      loadTransactions();
+    });
+
+    async function loadTransactions() {
+      const type = document.getElementById('filter-type').value;
+      const herbCode = document.getElementById('filter-herb').value;
+      let url = '/api/stock-transactions?';
+      if (type) url += `type=${type}&`;
+      if (herbCode) url += `herbCode=${encodeURIComponent(herbCode)}&`;
+
+      try {
+        const list = await api('GET', url);
+        renderTable(list);
+        updateStats(list);
+      } catch (e) {
+        document.getElementById('tx-table-body').innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-red-400">加载失败</td></tr>';
+      }
+    }
+
+    function updateStats(list) {
+      const totalIn = list.filter(t => t.type === 'in').reduce((acc, t) => acc + Math.abs(t.quantity || 0), 0);
+      const totalOut = list.filter(t => t.type === 'out').reduce((acc, t) => acc + Math.abs(t.quantity || 0), 0);
+      document.getElementById('stat-total-in').textContent = totalIn;
+      document.getElementById('stat-total-out').textContent = totalOut;
+      document.getElementById('stat-count').textContent = list.length;
+    }
+
+    function renderTable(list) {
+      const tbody = document.getElementById('tx-table-body');
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-gray-400"><i class="fa fa-inbox text-3xl mb-2"></i><p>暂无库存流水记录</p><p class="text-xs mt-1">采购入库、处方发药等操作将自动记录</p></td></tr>';
+        return;
+      }
+      tbody.innerHTML = list.map(tx => {
+        const isIn = tx.type === 'in';
+        const refText = tx.referenceType === 'purchase' ? `采购单 #${tx.referenceId}` :
+                        tx.referenceType === 'prescription' ? `处方 #${tx.referenceId}` :
+                        tx.referenceType || '-';
+        return `
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">${tx.createdAt || '-'}</td>
+            <td class="px-4 py-3">
+              <p class="text-sm font-medium text-gray-800">${tx.herbName}</p>
+              <p class="text-xs text-gray-400">${tx.herbCode}</p>
+            </td>
+            <td class="px-4 py-3">
+              <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${isIn ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
+                <i class="fa ${isIn ? 'fa-arrow-down' : 'fa-arrow-up'} mr-1"></i>${tx.typeText || (isIn ? '入库' : '出库')}
+              </span>
+            </td>
+            <td class="px-4 py-3 text-sm font-bold ${isIn ? 'tx-in' : 'tx-out'}">${isIn ? '+' : ''}${tx.quantity}</td>
+            <td class="px-4 py-3 text-sm text-gray-600">${tx.balanceAfter ?? '-'}</td>
+            <td class="px-4 py-3 text-sm text-gray-500">${refText}</td>
+            <td class="px-4 py-3 text-sm text-gray-500 max-w-xs truncate" title="${tx.remark || ''}">${tx.remark || '-'}</td>
+            <td class="px-4 py-3 text-sm text-gray-600">${tx.operatorName || tx.operator || '-'}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+// ===== 初始化统一布局 =====
+initUnifiedLayout("库存流水");
+    </script>
+
+    <!-- PWA Service Worker 注册 -->
+    <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('/sw.js')
+                .then(function(registration) {
+                    console.log('PWA: Service Worker 注册成功，范围:', registration.scope);
+                    
+                    // 监听更新
+                    registration.addEventListener('updatefound', function() {
+                        const newWorker = registration.installing;
+                        newWorker.addEventListener('statechange', function() {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                // 显示更新提示
+                                if (confirm('发现新版本，是否立即更新？')) {
+                                    newWorker.postMessage('SKIP_WAITING');
+                                    location.reload();
+                                }
+                            }
+                        });
+                    });
+                })
+                .catch(function(error) {
+                    console.log('PWA: Service Worker 注册失败:', error);
+                });
+        });
+    }
+    
+    // PWA 安装提示
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        console.log('PWA: 可以安装应用');
+        
+        // 显示安装按钮（如果有安装按钮元素）
+        const installBtn = document.getElementById('pwa-install-btn');
+        if (installBtn) {
+            installBtn.style.display = 'flex';
+            installBtn.addEventListener('click', function() {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    deferredPrompt.userChoice.then(function(choiceResult) {
+                        if (choiceResult.outcome === 'accepted') {
+                            console.log('PWA: 用户接受安装');
+                        }
+                        deferredPrompt = null;
+                        installBtn.style.display = 'none';
+                    });
+                }
+            });
+        }
+    });
+    
+    window.addEventListener('appinstalled', function() {
+        console.log('PWA: 应用已安装');
+        const installBtn = document.getElementById('pwa-install-btn');
+        if (installBtn) {
+            installBtn.style.display = 'none';
+        }
+    });
+    </script>
+
+</body>
+</html>

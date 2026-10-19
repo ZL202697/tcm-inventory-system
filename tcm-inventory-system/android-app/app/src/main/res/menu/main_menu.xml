@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/action_settings"
+        android:icon="@android:drawable/ic_menu_preferences"
+        android:title="服务器设置"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_refresh"
+        android:icon="@android:drawable/ic_menu_rotate"
+        android:title="刷新页面"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_copy_url"
+        android:icon="@android:drawable/ic_menu_share"
+        android:title="复制当前地址"
+        app:showAsAction="never" />
+
+</menu>

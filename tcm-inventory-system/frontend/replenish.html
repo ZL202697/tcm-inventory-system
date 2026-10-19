@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>库存预警与智能补货 - 本草智管平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f7fa; }
+        .sidebar { width: 240px; background: linear-gradient(180deg, #1a365d 0%, #2c5282 100%); min-height: 100vh; position: fixed; left: 0; top: 0; color: white; overflow-y: auto; z-index: 40; transform: translateX(-100%); transition: transform 0.3s ease; }
+        .sidebar.open { transform: translateX(0); }
+        @media (min-width: 768px) { .sidebar { transform: translateX(0); position: fixed; } }
+        .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 35; }
+        .sidebar-overlay.show { display: block; }
+        .sidebar-brand { padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .sidebar-brand h1 { font-size: 18px; font-weight: 600; }
+        .sidebar-brand p { font-size: 12px; opacity: 0.7; margin-top: 4px; }
+        .nav-item { display: flex; align-items: center; padding: 12px 20px; color: rgba(255,255,255,0.8); text-decoration: none; transition: all 0.2s; cursor: pointer; }
+        .nav-item:hover { background: rgba(255,255,255,0.1); color: white; }
+        .nav-item.active { background: rgba(255,255,255,0.15); color: white; border-left: 3px solid #68d391; }
+        .nav-item i { width: 20px; margin-right: 12px; }
+        .nav-section { padding: 16px 20px 8px; font-size: 11px; text-transform: uppercase; opacity: 0.5; letter-spacing: 1px; }
+        .main { margin-left: 0; min-height: 100vh; display: flex; flex-direction: column; }
+        @media (min-width: 768px) { .main { margin-left: 240px; } }
+        .topbar { background: white; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: sticky; top: 0; z-index: 30; }
+        @media (min-width: 768px) { .topbar { padding: 12px 24px; } }
+        .topbar h2 { font-size: 16px; font-weight: 600; color: #2d3748; display: flex; align-items: center; gap: 8px; }
+        @media (min-width: 768px) { .topbar h2 { font-size: 18px; } }
+        .menu-btn { background: none; border: none; font-size: 20px; color: #2d3748; cursor: pointer; padding: 4px 8px; }
+        @media (min-width: 768px) { .menu-btn { display: none; } }
+        .user-info { display: flex; align-items: center; gap: 8px; }
+        @media (min-width: 768px) { .user-info { gap: 12px; } }
+        .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #68d391, #38a169); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 14px; }
+        @media (min-width: 768px) { .user-avatar { width: 36px; height: 36px; } }
+        .role-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 500; }
+        @media (min-width: 768px) { .role-badge { font-size: 11px; } }
+        .role-badge.doctor { background: #bee3f8; color: #2c5282; }
+        .role-badge.admin { background: #fefcbf; color: #975a16; }
+        .content { flex: 1; padding: 16px; }
+        @media (min-width: 768px) { .content { padding: 24px; } }
+    </style>
+
+
+    <!-- PWA 支持 -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1a365d">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="本草智管">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <link rel="icon" type="image/x-icon" href="/icons/favicon.ico">
+
+</head>
+<body>
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <div class="sidebar" id="sidebar">
+
+        <div class="sidebar-brand">
+          <h1><i class="fas fa-leaf"></i> 本草智管</h1>
+          <p>中医门诊药材库存管理系统</p>
+        </div>
+        <div id="nav-menu">
+          <div class="nav-section">核心功能</div>
+          <div class="nav-item" onclick="location.href='dashboard.html'"><i class="fas fa-tachometer-alt"></i>控制面板</div>
+          <div class="nav-item" onclick="location.href='prescriptions.html'"><i class="fas fa-file-prescription"></i>处方管理</div>
+          <div class="nav-item" onclick="location.href='data-board.html'"><i class="fas fa-chart-bar"></i>数据看板</div>
+          <div class="nav-section">库存管理</div>
+          <div class="nav-item" onclick="location.href='herbs.html'"><i class="fas fa-boxes"></i>药材管理</div>
+          <div class="nav-item" onclick="location.href='purchase.html'"><i class="fas fa-truck-loading"></i>采购管理</div>
+          <div class="nav-item" onclick="location.href='replenish.html'"><i class="fas fa-bell"></i>库存预警/补货</div>
+          <div class="nav-item" onclick="location.href='stock-flow.html'"><i class="fas fa-exchange-alt"></i>库存流水</div>
+          <div class="nav-section">系统管理</div>
+          <div class="nav-item" onclick="location.href='users.html'"><i class="fas fa-users"></i>用户管理</div>
+          <div class="nav-item" onclick="location.href='logs.html'"><i class="fas fa-history"></i>操作日志</div>
+          <div class="nav-item" onclick="logout()"><i class="fas fa-sign-out-alt"></i>退出登录</div>
+        </div>
+
+    </div>
+
+    <div class="main">
+        <div class="topbar">
+            <div style="display:flex;align-items:center;gap:8px;">
+                <button class="menu-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                <h2><i class="fas fa-bell" style="color:#68d391;"></i> 库存预警/补货</h2>
+            </div>
+            <div class="user-info">
+                <span id="topbar-role-badge" class="role-badge"></span>
+                <span id="topbar-username" style="font-size:13px;color:#4a5568;"></span>
+                <div class="user-avatar" id="topbar-avatar"></div>
+            </div>
+        </div>
+
+        <!-- 兼容层：旧布局元素的隐藏占位，防止原JS报错 -->
+        <div style="display:none;">
+            <button id="sidebar-toggle"></button>
+            <span id="welcome-message"></span>
+            <p id="sidebar-username"></p>
+            <p id="sidebar-role"></p>
+            <button id="logout-btn" onclick="logout()"></button>
+            <nav id="sidebar-nav"></nav>
+        </div>
+
+        <div class="content">
+<div class="space-y-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-2xl font-bold text-gray-800">库存预警与智能补货</h2>
+            <p class="text-gray-500 mt-1">基于历史消耗数据智能分析，自动生成补货建议</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <select id="days-select" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50">
+              <option value="7">近7天</option>
+              <option value="14">近14天</option>
+              <option value="30" selected>近30天</option>
+              <option value="60">近60天</option>
+              <option value="90">近90天</option>
+            </select>
+            <button id="btn-refresh" class="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
+              <i class="fa fa-refresh mr-1"></i> 刷新分析
+            </button>
+          </div>
+        </div>
+
+        <!-- 统计卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="bg-white rounded-xl p-4 shadow-md border-l-4 border-red-500">
+            <p class="text-sm text-gray-500">紧急缺货</p>
+            <p class="text-2xl font-bold text-red-600 mt-1" id="stat-critical">0</p>
+            <p class="text-xs text-gray-400 mt-1">库存为0，需立即补货</p>
+          </div>
+          <div class="bg-white rounded-xl p-4 shadow-md border-l-4 border-yellow-500">
+            <p class="text-sm text-gray-500">库存不足</p>
+            <p class="text-2xl font-bold text-yellow-600 mt-1" id="stat-warning">0</p>
+            <p class="text-xs text-gray-400 mt-1">低于预警阈值</p>
+          </div>
+          <div class="bg-white rounded-xl p-4 shadow-md border-l-4 border-blue-500">
+            <p class="text-sm text-gray-500">补货建议数</p>
+            <p class="text-2xl font-bold text-blue-600 mt-1" id="stat-suggestions">0</p>
+            <p class="text-xs text-gray-400 mt-1">基于消耗趋势分析</p>
+          </div>
+          <div class="bg-white rounded-xl p-4 shadow-md border-l-4 border-green-500">
+            <p class="text-sm text-gray-500">预计采购金额</p>
+            <p class="text-2xl font-bold text-green-600 mt-1">¥<span id="stat-cost">0</span></p>
+            <p class="text-xs text-gray-400 mt-1">按建议补货量估算</p>
+          </div>
+        </div>
+
+        <!-- 库存预警列表 -->
+        <div class="bg-white rounded-xl shadow-md overflow-hidden">
+          <div class="px-6 py-4 border-b bg-gray-50">
+            <h3 class="text-lg font-bold text-gray-800"><i class="fa fa-exclamation-triangle text-yellow-500 mr-2"></i>库存预警列表</h3>
+          </div>
+          <div id="warning-list" class="divide-y divide-gray-100">
+            <div class="p-8 text-center text-gray-400">加载中...</div>
+          </div>
+        </div>
+
+        <!-- 智能补货建议 -->
+        <div class="bg-white rounded-xl shadow-md overflow-hidden">
+          <div class="px-6 py-4 border-b bg-gray-50 flex justify-between items-center">
+            <h3 class="text-lg font-bold text-gray-800"><i class="fa fa-lightbulb-o text-primary mr-2"></i>智能补货建议</h3>
+            <button id="btn-create-po" class="px-3 py-1.5 bg-primary text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors">
+              <i class="fa fa-shopping-cart mr-1"></i> 生成采购单
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-gray-50 border-b">
+                <tr>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">优先级</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">药材</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">当前库存</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">日均消耗</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">可维持天数</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">建议补货量</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">预计金额</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">库存状态</th>
+                </tr>
+              </thead>
+              <tbody id="suggestion-table-body" class="divide-y divide-gray-200">
+                <tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">加载中...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+        </div>
+    </div>
+
+    <script>
+
+    // ===== 统一布局工具函数 =====
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('sidebar-overlay').classList.toggle('show');
+    }
+    function logout() {
+      sessionStorage.removeItem('current_user');
+      sessionStorage.removeItem('current_role');
+      sessionStorage.removeItem('current_name');
+      window.location.href = 'index.html';
+    }
+    function initUnifiedLayout(pageName) {
+      const currentUser = sessionStorage.getItem('current_user');
+      const currentRole = sessionStorage.getItem('current_role');
+      const currentName = sessionStorage.getItem('current_name') || currentUser;
+      if (!currentUser) { window.location.href = 'index.html'; return; }
+      const roleText = { admin: '管理员', doctor: '医生' };
+      const userNameEl = document.getElementById('topbar-username');
+      const userAvatarEl = document.getElementById('topbar-avatar');
+      const roleBadgeEl = document.getElementById('topbar-role-badge');
+      if (userNameEl) userNameEl.textContent = currentName;
+      if (userAvatarEl) userAvatarEl.textContent = currentName.charAt(0);
+      if (roleBadgeEl) {
+        roleBadgeEl.className = 'role-badge ' + currentRole;
+        roleBadgeEl.textContent = roleText[currentRole] || currentRole;
+      }
+      document.querySelectorAll('.nav-item').forEach(item => {
+        if (item.textContent.includes(pageName)) item.classList.add('active');
+      });
+      const rolePermissions = {
+        doctor: ['控制面板', '处方管理', '数据看板', '药材管理', '采购管理', '库存预警/补货', '库存流水', '退出登录'],
+        admin: ['控制面板', '处方管理', '数据看板', '药材管理', '采购管理', '库存预警/补货', '库存流水', '用户管理', '操作日志', '退出登录'],
+      };
+      const allowed = rolePermissions[currentRole] || [];
+      document.querySelectorAll('.nav-item').forEach(item => {
+        const text = item.textContent.trim();
+        if (!allowed.some(a => text.includes(a))) item.style.display = 'none';
+      });
+    }
+
+
+// ===== 原页面业务逻辑 =====
+tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#2E7D32',
+            secondary: '#8D6E63',
+            accent: '#D32F2F',
+            neutral: '#F5F5F5',
+          }
+        }
+      }
+    }
+
+const API_BASE = '';
+    async function api(method, url, body) {
+      const opts = { method: method, headers: { 'Content-Type': 'application/json', 'X-User': sessionStorage.getItem('current_user') || '' } };
+      if (body !== undefined) opts.body = JSON.stringify(body);
+      const resp = await fetch(API_BASE + url, opts);
+      const result = await resp.json().catch(() => ({ code: -1, message: '服务器连接失败' }));
+      if (result.code !== 0) { alert(result.message); throw new Error(result.message); }
+      return result.data;
+    }
+
+    const PRIORITY_TEXT = { critical: '紧急', high: '高', medium: '中', low: '低' };
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      const currentUser = sessionStorage.getItem('current_user');
+      const currentRole = sessionStorage.getItem('current_role');
+      const currentName = sessionStorage.getItem('current_name') || currentUser;
+      if (!currentUser) window.location.href = 'index.html';
+
+      const roleText = { admin: '管理员', doctor: '医生' };
+      document.getElementById('welcome-message').textContent = `欢迎，${currentName}`;
+      document.getElementById('sidebar-username').textContent = currentName;
+      document.getElementById('sidebar-role').textContent = roleText[currentRole] || '用户';
+
+      document.querySelectorAll('#sidebar-nav > a').forEach(item => {
+        const allowedRoles = item.dataset.role.split(',');
+        if (!allowedRoles.includes(currentRole)) item.classList.add('hidden');
+      });
+
+      document.getElementById('sidebar-toggle').addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('-translate-x-full');
+      });
+      document.getElementById('logout-btn').addEventListener('click', () => {
+        sessionStorage.clear();
+        window.location.href = 'index.html';
+      });
+
+      document.getElementById('btn-refresh').addEventListener('click', loadData);
+      document.getElementById('days-select').addEventListener('change', loadData);
+      document.getElementById('btn-create-po').addEventListener('click', () => {
+        window.location.href = 'purchase.html';
+      });
+
+      loadData();
+    });
+
+    async function loadData() {
+      const days = document.getElementById('days-select').value;
+      try {
+        const [warnings, suggestions] = await Promise.all([
+          api('GET', '/api/stock/warnings'),
+          api('GET', `/api/stock/replenish-suggestions?days=${days}`)
+        ]);
+        renderWarnings(warnings);
+        renderSuggestions(suggestions);
+        updateStats(warnings, suggestions);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function updateStats(warnings, suggestions) {
+      const critical = warnings.filter(w => w.status === 'critical').length;
+      const warning = warnings.filter(w => w.status === 'warning').length;
+      document.getElementById('stat-critical').textContent = critical;
+      document.getElementById('stat-warning').textContent = warning;
+      document.getElementById('stat-suggestions').textContent = suggestions.totalSuggestions;
+      document.getElementById('stat-cost').textContent = (suggestions.totalEstimatedCost || 0).toFixed(2);
+    }
+
+    function renderWarnings(list) {
+      const container = document.getElementById('warning-list');
+      if (list.length === 0) {
+        container.innerHTML = '<div class="p-8 text-center text-gray-400"><i class="fa fa-check-circle text-4xl text-green-400 mb-2"></i><p>所有药材库存充足，暂无预警</p></div>';
+        return;
+      }
+      container.innerHTML = list.map(h => {
+        const percent = h.warningThreshold > 0 ? Math.min(100, (h.quantity / h.warningThreshold) * 100) : 0;
+        const barColor = h.quantity === 0 ? '#dc3545' : percent < 50 ? '#ffc107' : '#17a2b8';
+        return `
+          <div class="px-6 py-4 hover:bg-gray-50">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center flex-1">
+                <div class="w-10 h-10 rounded-full ${h.quantity === 0 ? 'bg-red-100 text-red-500' : 'bg-yellow-100 text-yellow-500'} flex items-center justify-center mr-4">
+                  <i class="fa ${h.quantity === 0 ? 'fa-times-circle' : 'fa-exclamation-triangle'}"></i>
+                </div>
+                <div class="flex-1">
+                  <div class="flex items-center gap-3">
+                    <span class="font-medium text-gray-800">${h.name}</span>
+                    <span class="text-xs text-gray-400">${h.code}</span>
+                    <span class="text-xs px-2 py-0.5 bg-gray-100 rounded text-gray-500">${h.category || '未分类'}</span>
+                  </div>
+                  <div class="mt-2 flex items-center gap-4">
+                    <div class="flex-1 max-w-xs">
+                      <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${percent}%; background: ${barColor};"></div>
+                      </div>
+                    </div>
+                    <span class="text-sm ${h.quantity === 0 ? 'text-red-600 font-bold' : 'text-yellow-600'}">${h.quantity} ${h.unit}</span>
+                    <span class="text-xs text-gray-400">/ 阈值 ${h.warningThreshold}${h.unit}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="text-right ml-4">
+                <p class="text-sm text-gray-500">缺口</p>
+                <p class="text-lg font-bold text-red-500">${h.shortage} ${h.unit}</p>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderSuggestions(data) {
+      const tbody = document.getElementById('suggestion-table-body');
+      const items = data.items || [];
+      if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-gray-400"><i class="fa fa-check-circle text-3xl text-green-400 mb-2"></i><p>库存充足，暂无补货建议</p></td></tr>';
+        return;
+      }
+      tbody.innerHTML = items.map(s => {
+        const daysColor = s.daysRemaining <= 7 ? 'text-red-600 font-bold' : s.daysRemaining <= 15 ? 'text-yellow-600' : 'text-gray-600';
+        return `
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-3"><span class="priority-badge priority-${s.priority}" style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:500;">${PRIORITY_TEXT[s.priority] || s.priority}</span></td>
+            <td class="px-4 py-3">
+              <p class="font-medium text-gray-800">${s.name}</p>
+              <p class="text-xs text-gray-400">${s.code} · ${s.category || ''}</p>
+            </td>
+            <td class="px-4 py-3 text-sm">${s.currentStock} ${s.unit}</td>
+            <td class="px-4 py-3 text-sm">${s.dailyAvgUsage} ${s.unit}/天</td>
+            <td class="px-4 py-3 text-sm ${daysColor}">${s.daysRemaining >= 999 ? '∞' : s.daysRemaining + ' 天'}</td>
+            <td class="px-4 py-3 text-sm font-medium text-primary">${s.suggestedQuantity} ${s.unit}</td>
+            <td class="px-4 py-3 text-sm font-medium text-gray-800">¥${s.estimatedCost.toFixed(2)}</td>
+            <td class="px-4 py-3">
+              <div class="w-20 progress-bar">
+                <div class="progress-fill" style="width: ${Math.min(100, (s.currentStock / (s.warningThreshold || 1)) * 100)}%; background: ${s.currentStock === 0 ? '#dc3545' : s.currentStock <= s.warningThreshold ? '#ffc107' : '#28a745'};"></div>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+// ===== 初始化统一布局 =====
+initUnifiedLayout("库存预警/补货");
+    </script>
+
+    <!-- PWA Service Worker 注册 -->
+    <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('/sw.js')
+                .then(function(registration) {
+                    console.log('PWA: Service Worker 注册成功，范围:', registration.scope);
+                    
+                    // 监听更新
+                    registration.addEventListener('updatefound', function() {
+                        const newWorker = registration.installing;
+                        newWorker.addEventListener('statechange', function() {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                // 显示更新提示
+                                if (confirm('发现新版本，是否立即更新？')) {
+                                    newWorker.postMessage('SKIP_WAITING');
+                                    location.reload();
+                                }
+                            }
+                        });
+                    });
+                })
+                .catch(function(error) {
+                    console.log('PWA: Service Worker 注册失败:', error);
+                });
+        });
+    }
+    
+    // PWA 安装提示
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        console.log('PWA: 可以安装应用');
+        
+        // 显示安装按钮（如果有安装按钮元素）
+        const installBtn = document.getElementById('pwa-install-btn');
+        if (installBtn) {
+            installBtn.style.display = 'flex';
+            installBtn.addEventListener('click', function() {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    deferredPrompt.userChoice.then(function(choiceResult) {
+                        if (choiceResult.outcome === 'accepted') {
+                            console.log('PWA: 用户接受安装');
+                        }
+                        deferredPrompt = null;
+                        installBtn.style.display = 'none';
+                    });
+                }
+            });
+        }
+    });
+    
+    window.addEventListener('appinstalled', function() {
+        console.log('PWA: 应用已安装');
+        const installBtn = document.getElementById('pwa-install-btn');
+        if (installBtn) {
+            installBtn.style.display = 'none';
+        }
+    });
+    </script>
+
+</body>
+</html>
