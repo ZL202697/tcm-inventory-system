@@ -1182,21 +1182,36 @@ def replenish_suggestions():
         total_usage = float(rows[0]["total_usage"]) if rows else 0
         daily_avg = round(total_usage / days, 1) if days > 0 else 0
 
-        # 计算可维持天数
-        days_remaining = round(herb["quantity"] / daily_avg, 1) if daily_avg > 0 else 999
+        # 计算可维持天数（无消耗记录时缺货显示 0 天；有库存无消耗显示 None，避免出现无穷大）
+        if daily_avg > 0:
+            days_remaining = round(herb["quantity"] / daily_avg, 1)
+        elif herb["quantity"] <= 0:
+            days_remaining = 0
+        else:
+            days_remaining = None
 
-        # 建议补货量 = 30天消耗量 - 当前库存（如果为正）
-        suggest_qty = max(0, int(daily_avg * 30) - herb["quantity"])
+        # 建议补货量：有消耗按 30 天消耗补足；无消耗但缺货/低于阈值时补足到预警阈值，避免缺货药材建议 0g
+        threshold = herb["warning_threshold"] or 0
+        if daily_avg > 0:
+            suggest_qty = max(0, int(daily_avg * 30) - herb["quantity"])
+            if herb["quantity"] <= 0 and suggest_qty < threshold:
+                suggest_qty = int(threshold)
+        elif herb["quantity"] <= 0:
+            suggest_qty = max(0, int(threshold) - herb["quantity"])
+        elif herb["quantity"] < threshold:
+            suggest_qty = max(0, int(threshold) - herb["quantity"])
+        else:
+            suggest_qty = 0
 
         # 优先级判断
         if herb["quantity"] <= 0:
             priority = "critical"
-        elif days_remaining <= 7:
+        elif days_remaining is not None and days_remaining <= 7:
             priority = "high"
-        elif days_remaining <= 15:
+        elif days_remaining is not None and days_remaining <= 15:
             priority = "medium"
         elif suggest_qty > 0:
-            priority = "low"
+            priority = "medium"
         else:
             continue
 
@@ -1212,7 +1227,8 @@ def replenish_suggestions():
 
     # 按优先级排序
     priority_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-    suggestions.sort(key=lambda x: (priority_order.get(x["priority"], 9), x["daysRemaining"]))
+    suggestions.sort(key=lambda x: (priority_order.get(x["priority"], 9),
+                                    x["daysRemaining"] if x["daysRemaining"] is not None else 9999))
 
     return ok({
         "days": days,
