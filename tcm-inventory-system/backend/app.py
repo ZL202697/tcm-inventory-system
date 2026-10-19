@@ -232,6 +232,7 @@ def add_herb():
         (code, name, d.get("category"), d.get("origin"), d.get("storage"), d.get("unit"),
          d.get("price", 0), d.get("quantity", 0), d.get("warningThreshold", 200), d.get("description")),
     )
+    add_log(code, name, "add", d, user["username"], user["name"])
     return ok(None, "药材添加成功")
 
 
@@ -252,6 +253,7 @@ def update_herb(code):
          d.get("price", old["price"]), d.get("quantity", old["quantity"]),
          d.get("warningThreshold", old["warning_threshold"]), d.get("description", old["description"]), code),
     )
+    add_log(code, old["name"], "edit", d, user["username"], user["name"])
     return ok(None, "药材更新成功")
 
 
@@ -264,6 +266,7 @@ def delete_herb(code):
     if not old:
         return fail("药材不存在")
     execute("DELETE FROM herbs WHERE code = %s", (code,))
+    add_log(code, old["name"], "delete", old, user["username"], user["name"])
     return ok(None, "药材删除成功")
 
 
@@ -467,9 +470,15 @@ def dashboard():
     herb_list = [herb_to_camel(r) for r in herbs]
     total_quantity = sum(h["quantity"] or 0 for h in herb_list)
     low_stock = [h for h in herb_list if (h["quantity"] or 0) <= (h["warningThreshold"] or 200)]
+    logs = query("SELECT * FROM operation_logs ORDER BY timestamp DESC LIMIT 100")
     return ok({
         "herbs": herb_list, "totalCount": len(herb_list),
         "totalQuantity": total_quantity, "lowStock": low_stock,
+        "logs": [{
+            "id": f"log_{r['id']}", "herbCode": r["herb_code"], "herbName": r["herb_name"],
+            "action": r["action"], "operator": r["operator"], "operatorName": r["operator_name"],
+            "timestamp": r["timestamp"], "timeStr": r["time_str"],
+        } for r in logs],
     })
 
 
