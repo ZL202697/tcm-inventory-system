@@ -8,6 +8,7 @@
     python app.py
 浏览器访问 http://127.0.0.1:5000
 """
+import datetime as _dt
 import hashlib
 import json
 import os
@@ -36,6 +37,19 @@ def ok(data=None, message="success"):
 
 def fail(message, code=1, http=200):
     return jsonify({"code": code, "message": message, "data": None}), http
+
+
+def _cn_time(v):
+    """数据库/服务器时间按 UTC 存储，返回给前端前统一显示为北京时间（UTC+8）。"""
+    if not v:
+        return None
+    s = str(v).strip().replace("/", "-")
+    try:
+        t = _dt.datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return str(v)
+    t2 = t + _dt.timedelta(hours=8)
+    return t2.strftime("%Y/%m/%d %H:%M:%S")
 
 
 def get_current_user():
@@ -100,11 +114,11 @@ def prescription_to_camel(row, items=None):
         "auditRemark": row["audit_remark"],
         "auditor": row["auditor"],
         "auditorName": row["auditor_name"],
-        "auditTime": row["audit_time"],
+        "auditTime": _cn_time(row["audit_time"]),
         "dispenser": row["dispenser"],
         "dispenserName": row["dispenser_name"],
-        "dispenseTime": row["dispense_time"],
-        "createdAt": str(row["created_at"]) if row["created_at"] else None,
+        "dispenseTime": _cn_time(row["dispense_time"]),
+        "createdAt": _cn_time(row["created_at"]),
         "items": items or [],
     }
 
@@ -855,7 +869,7 @@ def list_suppliers():
     return ok([{
         "id": r["id"], "name": r["name"], "contactPerson": r["contact_person"],
         "phone": r["phone"], "address": r["address"], "description": r["description"],
-        "status": r["status"], "createdAt": str(r["created_at"]) if r["created_at"] else None,
+        "status": r["status"], "createdAt": _cn_time(r["created_at"]),
     } for r in rows])
 
 
@@ -939,8 +953,8 @@ def list_purchase_orders():
             "supplierName": r["supplier_name"], "totalAmount": float(r["total_amount"]) if r["total_amount"] else 0,
             "status": r["status"], "statusText": PO_STATUS_MAP.get(r["status"], r["status"]),
             "remark": r["remark"], "creator": r["creator"], "creatorName": r["creator_name"],
-            "auditor": r["auditor"], "auditorName": r["auditor_name"], "auditTime": r["audit_time"],
-            "inStockTime": r["in_stock_time"], "createdAt": str(r["created_at"]) if r["created_at"] else None,
+            "auditor": r["auditor"], "auditorName": r["auditor_name"], "auditTime": _cn_time(r["audit_time"]),
+            "inStockTime": _cn_time(r["in_stock_time"]), "createdAt": _cn_time(r["created_at"]),
             "items": [{
                 "id": i["id"], "herbCode": i["herb_code"], "herbName": i["herb_name"],
                 "quantity": i["quantity"], "unit": i["unit"], "price": float(i["price"]) if i["price"] else 0,
@@ -965,8 +979,8 @@ def get_purchase_order(po_id):
         "supplierName": row["supplier_name"], "totalAmount": float(row["total_amount"]) if row["total_amount"] else 0,
         "status": row["status"], "statusText": PO_STATUS_MAP.get(row["status"], row["status"]),
         "remark": row["remark"], "creator": row["creator"], "creatorName": row["creator_name"],
-        "auditor": row["auditor"], "auditorName": row["auditor_name"], "auditTime": row["audit_time"],
-        "inStockTime": row["in_stock_time"], "createdAt": str(row["created_at"]) if row["created_at"] else None,
+        "auditor": row["auditor"], "auditorName": row["auditor_name"], "auditTime": _cn_time(row["audit_time"]),
+        "inStockTime": _cn_time(row["in_stock_time"]), "createdAt": _cn_time(row["created_at"]),
         "items": [{
             "id": i["id"], "herbCode": i["herb_code"], "herbName": i["herb_name"],
             "quantity": i["quantity"], "unit": i["unit"], "price": float(i["price"]) if i["price"] else 0,
@@ -1116,7 +1130,7 @@ def list_stock_transactions():
         "quantity": r["quantity"], "balanceAfter": r["balance_after"],
         "referenceType": r["reference_type"], "referenceId": r["reference_id"],
         "remark": r["remark"], "operator": r["operator"], "operatorName": r["operator_name"],
-        "createdAt": str(r["created_at"]) if r["created_at"] else None,
+        "createdAt": _cn_time(r["created_at"]),
     } for r in rows])
 
 
