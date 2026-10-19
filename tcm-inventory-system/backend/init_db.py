@@ -13,7 +13,7 @@ import time
 
 from db import is_mysql, execute, query, SQLITE_DB_PATH
 
-DB_NAME = "herb_management_system"
+DB_NAME = os.environ.get("DB_NAME", "herb_management_system")
 
 
 # ============ SQLite 建表语句 ============
