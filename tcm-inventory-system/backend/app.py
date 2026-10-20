@@ -552,7 +552,8 @@ def dashboard():
 
 
 # ============ 处方接口（4号核心） ============
-STATUS_MAP = {"pending": "待审核", "approved": "已审核", "rejected": "已拒绝", "dispensed": "已发药"}
+# 说明：处方无需审核。新建后直接为"待发药"，点击发药后变为"已发药"。
+STATUS_MAP = {"open": "待发药", "dispensed": "已发药"}
 
 
 @app.route("/api/prescriptions", methods=["GET"])
@@ -633,7 +634,7 @@ def create_prescription():
         """INSERT INTO prescriptions
            (prescription_no, patient_name, patient_phone, patient_gender, patient_age,
             doctor_username, doctor_name, department, diagnosis, advice, total_amount, status)
-           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'pending')""",
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'open')""",
         (rx_no, patient_name, d.get("patientPhone"), d.get("patientGender"), d.get("patientAge"),
          user["username"], user["name"], d.get("department") or user.get("department"),
          d.get("diagnosis"), d.get("advice"), round(total, 2)),
@@ -654,31 +655,9 @@ def create_prescription():
              item.get("usage"), qty, price, subtotal),
         )
     add_log(None, None, "rx_create", {"summary": "新建处方 %s：患者 %s，%d 味药材" % (rx_no, patient_name, len(items))}, user["username"], user["name"])
-    return ok({"id": rx_id, "prescriptionNo": rx_no}, "处方创建成功，等待审核")
+    return ok({"id": rx_id, "prescriptionNo": rx_no}, "处方创建成功，可直接发药")
 
 
-@app.route("/api/prescriptions/<int:rx_id>/audit", methods=["PUT"])
-def audit_prescription(rx_id):
-    user, err = require_admin()
-    if err:
-        return err
-    d = request.get_json(silent=True) or {}
-    action = (d.get("action") or "").strip()  # approve / reject
-    remark = (d.get("remark") or "").strip()
-    if action not in ("approve", "reject"):
-        return fail("审核操作不合法")
-    row = query("SELECT * FROM prescriptions WHERE id = %s", (rx_id,), one=True)
-    if not row:
-        return fail("处方不存在")
-    if row["status"] != "pending":
-        return fail("该处方已审核，不能重复审核")
-    new_status = "approved" if action == "approve" else "rejected"
-    execute(
-        "UPDATE prescriptions SET status=%s, audit_remark=%s, auditor=%s, auditor_name=%s, audit_time=%s WHERE id=%s",
-        (new_status, remark, user["username"], user["name"], time.strftime("%Y/%m/%d %H:%M:%S"), rx_id),
-    )
-    add_log(None, None, "rx_audit", {"summary": "审核处方 #%s（患者 %s）→%s" % (rx_id, row["patient_name"], "通过" if action == "approve" else "拒绝")}, user["username"], user["name"])
-    return ok(None, f"处方已{'通过' if action == 'approve' else '拒绝'}")
 
 
 @app.route("/api/prescriptions/<int:rx_id>/dispense", methods=["PUT"])
@@ -689,8 +668,8 @@ def dispense_prescription(rx_id):
     row = query("SELECT * FROM prescriptions WHERE id = %s", (rx_id,), one=True)
     if not row:
         return fail("处方不存在")
-    if row["status"] != "approved":
-        return fail("只有已审核的处方才能发药")
+    if row["status"] != "open":
+        return fail("该处方已发药，不能重复发药")
     items = query("SELECT * FROM prescription_items WHERE prescription_id = %s", (rx_id,))
     # 扣减库存
     for item in items:
@@ -741,11 +720,9 @@ def stats_overview():
         return err
     # 处方统计
     total_rx = query("SELECT COUNT(*) as cnt FROM prescriptions", one=True)["cnt"]
-    pending_rx = query("SELECT COUNT(*) as cnt FROM prescriptions WHERE status='pending'", one=True)["cnt"]
-    approved_rx = query("SELECT COUNT(*) as cnt FROM prescriptions WHERE status='approved'", one=True)["cnt"]
+    open_rx = query("SELECT COUNT(*) as cnt FROM prescriptions WHERE status='open'", one=True)["cnt"]
     dispensed_rx = query("SELECT COUNT(*) as cnt FROM prescriptions WHERE status='dispensed'", one=True)["cnt"]
-    rejected_rx = query("SELECT COUNT(*) as cnt FROM prescriptions WHERE status='rejected'", one=True)["cnt"]
-    total_amount = query("SELECT COALESCE(SUM(total_amount),0) as amt FROM prescriptions WHERE status IN ('approved','dispensed')", one=True)["amt"]
+    total_amount = query("SELECT COALESCE(SUM(total_amount),0) as amt FROM prescriptions WHERE status='dispensed'", one=True)["amt"]
 
     # 药材统计
     total_herbs = query("SELECT COUNT(*) as cnt FROM herbs", one=True)["cnt"]
@@ -757,8 +734,8 @@ def stats_overview():
     doctor_count = query("SELECT COUNT(*) as cnt FROM users WHERE role='doctor'", one=True)["cnt"]
 
     return ok({
-        "prescriptions": {"total": total_rx, "pending": pending_rx, "approved": approved_rx,
-                           "dispensed": dispensed_rx, "rejected": rejected_rx,
+        "prescriptions": {"total": total_rx, "open": open_rx,
+                           "dispensed": dispensed_rx,
                            "totalAmount": float(total_amount)},
         "herbs": {"total": total_herbs, "totalStock": total_stock, "lowStock": low_stock},
         "users": {"total": total_users, "doctors": doctor_count},
@@ -924,7 +901,8 @@ def delete_supplier(sid):
 
 
 # ============ 采购管理 API ============
-PO_STATUS_MAP = {"pending": "待审核", "approved": "已审核", "completed": "已入库", "rejected": "已拒绝", "cancelled": "已取消"}
+# 说明：采购单无需审核。新建后直接为"待入库"，点击入库后变为"已入库"。
+PO_STATUS_MAP = {"open": "待入库", "completed": "已入库"}
 
 
 @app.route("/api/purchase-orders", methods=["GET"])
@@ -1015,7 +993,7 @@ def create_purchase_order():
     _, po_id = execute(
         """INSERT INTO purchase_orders
            (order_no,supplier_id,supplier_name,total_amount,status,remark,creator,creator_name)
-           VALUES (%s,%s,%s,%s,'pending',%s,%s,%s)""",
+           VALUES (%s,%s,%s,%s,'open',%s,%s,%s)""",
         (po_no, supplier_id, supplier_name, round(total, 2), d.get("remark"),
          user["username"], user["name"])
     )
@@ -1031,30 +1009,9 @@ def create_purchase_order():
              item.get("unit", "g"), price, subtotal)
         )
     add_log(None, None, "po_create", {"summary": "创建采购单 %s：供应商 %s，%d 项，总额 %.2f" % (po_no, supplier_name, len(items), total)}, user["username"], user["name"])
-    return ok({"id": po_id, "orderNo": po_no}, "采购单创建成功，等待审核")
+    return ok({"id": po_id, "orderNo": po_no}, "采购单创建成功，可直接入库")
 
 
-@app.route("/api/purchase-orders/<int:po_id>/audit", methods=["PUT"])
-def audit_purchase_order(po_id):
-    user, err = require_admin()
-    if err:
-        return err
-    d = request.get_json(silent=True) or {}
-    action = (d.get("action") or "").strip()
-    if action not in ("approve", "reject"):
-        return fail("审核操作不合法")
-    row = query("SELECT * FROM purchase_orders WHERE id = %s", (po_id,), one=True)
-    if not row:
-        return fail("采购单不存在")
-    if row["status"] != "pending":
-        return fail("该采购单已审核，不能重复审核")
-    new_status = "approved" if action == "approve" else "rejected"
-    execute(
-        "UPDATE purchase_orders SET status=%s, auditor=%s, auditor_name=%s, audit_time=%s WHERE id=%s",
-        (new_status, user["username"], user["name"], time.strftime("%Y/%m/%d %H:%M:%S"), po_id)
-    )
-    add_log(None, None, "po_audit", {"summary": "审核采购单 %s →%s" % (row["order_no"], "通过" if action == "approve" else "拒绝")}, user["username"], user["name"])
-    return ok(None, f"采购单已{'通过' if action == 'approve' else '拒绝'}")
 
 
 @app.route("/api/purchase-orders/<int:po_id>/in-stock", methods=["PUT"])
@@ -1065,8 +1022,8 @@ def purchase_order_in_stock(po_id):
     row = query("SELECT * FROM purchase_orders WHERE id = %s", (po_id,), one=True)
     if not row:
         return fail("采购单不存在")
-    if row["status"] != "approved":
-        return fail("只有已审核的采购单才能入库")
+    if row["status"] != "open":
+        return fail("该采购单已入库，不能重复入库")
     items = query("SELECT * FROM purchase_items WHERE purchase_id = %s", (po_id,))
     # 入库：增加库存
     for item in items:
@@ -1245,16 +1202,27 @@ def stats_purchase_overview():
     if err:
         return err
     total_po = query("SELECT COUNT(*) as cnt FROM purchase_orders", one=True)["cnt"]
-    pending_po = query("SELECT COUNT(*) as cnt FROM purchase_orders WHERE status='pending'", one=True)["cnt"]
     completed_po = query("SELECT COUNT(*) as cnt FROM purchase_orders WHERE status='completed'", one=True)["cnt"]
     total_amount = query("SELECT COALESCE(SUM(total_amount),0) as amt FROM purchase_orders WHERE status='completed'", one=True)["amt"]
     total_in = query("SELECT COALESCE(SUM(quantity),0) as qty FROM stock_transactions WHERE type='in'", one=True)["qty"]
     total_out = query("SELECT COALESCE(SUM(ABS(quantity)),0) as qty FROM stock_transactions WHERE type='out'", one=True)["qty"]
     return ok({
-        "purchaseOrders": {"total": total_po, "pending": pending_po, "completed": completed_po,
+        "purchaseOrders": {"total": total_po, "completed": completed_po,
                            "totalAmount": float(total_amount)},
         "stockFlow": {"totalIn": total_in, "totalOut": total_out},
     })
+
+
+# ============ 启动数据迁移 ============
+def migrate_pending_status():
+    """去掉审核状态后，把历史遗留的 pending/approved/rejected 记录统一归为 open（待发药/待入库）。"""
+    try:
+        r1 = execute("UPDATE prescriptions SET status='open' WHERE status <> 'dispensed'")
+        r2 = execute("UPDATE purchase_orders SET status='open' WHERE status <> 'completed'")
+        print("[migrate] 处方非已发药→待发药迁移: %s 条" % (r1[0] if isinstance(r1, tuple) else r1))
+        print("[migrate] 采购单非已入库→待入库迁移: %s 条" % (r2[0] if isinstance(r2, tuple) else r2))
+    except Exception as e:
+        print("[migrate] 数据迁移跳过（表可能不存在）:", e)
 
 
 if __name__ == "__main__":
@@ -1266,4 +1234,5 @@ if __name__ == "__main__":
     print("默认账号: admin/123456 (管理员)")
     print("          doctor/123456 (医生)")
     print("=" * 50)
+    migrate_pending_status()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "5000")), debug=False)

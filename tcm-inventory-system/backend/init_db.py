@@ -215,8 +215,7 @@ SAMPLE_PURCHASE_ORDERS = [
     },
     {
         "order_no": "PO20260905001", "supplier_id": 2, "supplier_name": "河北安国中药材市场",
-        "status": "approved", "remark": "补充库存", "creator": "admin", "creator_name": "系统管理员",
-        "auditor": "admin", "auditor_name": "系统管理员", "audit_time": "2026/09/05 10:00:00",
+        "status": "open", "remark": "补充库存", "creator": "admin", "creator_name": "系统管理员",
         "items": [
             {"herb_code": "HC003", "herb_name": "白术", "quantity": 1000, "unit": "g", "price": 0.15},
             {"herb_code": "HC004", "herb_name": "茯苓", "quantity": 1500, "unit": "g", "price": 0.10},
@@ -224,7 +223,7 @@ SAMPLE_PURCHASE_ORDERS = [
     },
     {
         "order_no": "PO20260910001", "supplier_id": 1, "supplier_name": "安徽亳州中药材批发市场",
-        "status": "pending", "remark": "待审核采购单", "creator": "admin", "creator_name": "系统管理员",
+        "status": "open", "remark": "待入库采购单", "creator": "admin", "creator_name": "系统管理员",
         "items": [
             {"herb_code": "HC010", "herb_name": "党参", "quantity": 500, "unit": "g", "price": 0.25},
             {"herb_code": "HC008", "herb_name": "柴胡", "quantity": 800, "unit": "g", "price": 0.18},
@@ -268,7 +267,7 @@ SAMPLE_PRESCRIPTIONS = [
         "patient_name": "赵强", "patient_phone": "13500135000", "patient_gender": "男", "patient_age": 45,
         "doctor_username": "doctor", "doctor_name": "李医生", "department": "中医内科",
         "diagnosis": "脾虚湿盛证", "advice": "水煎服，每日一剂，忌食生冷油腻",
-        "status": "pending",
+        "status": "open",
         "items": [
             {"herb_code": "HC003", "herb_name": "白术", "dosage": "20g", "usage": "水煎", "quantity": 7, "price": 0.18},
             {"herb_code": "HC004", "herb_name": "茯苓", "dosage": "20g", "usage": "水煎", "quantity": 7, "price": 0.12},
@@ -282,8 +281,7 @@ SAMPLE_PRESCRIPTIONS = [
         "patient_name": "孙丽", "patient_phone": "13400134000", "patient_gender": "女", "patient_age": 52,
         "doctor_username": "doctor2", "doctor_name": "张医生", "department": "中医妇科",
         "diagnosis": "更年期综合征，肝肾阴虚", "advice": "水煎服，每日一剂",
-        "status": "rejected", "audit_remark": "剂量偏大，请调整后重新提交", "auditor": "admin", "auditor_name": "系统管理员",
-        "audit_time": "2026/09/04 09:00:00",
+        "status": "open",
         "items": [
             {"herb_code": "HC008", "herb_name": "柴胡", "dosage": "12g", "usage": "水煎", "quantity": 7, "price": 0.22},
             {"herb_code": "HC009", "herb_name": "黄芩", "dosage": "10g", "usage": "水煎", "quantity": 7, "price": 0.19},
