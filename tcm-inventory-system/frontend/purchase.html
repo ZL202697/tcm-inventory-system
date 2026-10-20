@@ -108,7 +108,7 @@
         <div class="flex items-center justify-between">
           <div>
             <h2 class="text-2xl font-bold text-gray-800">采购管理</h2>
-            <p class="text-gray-500 mt-1">管理药材采购订单，支持创建、审核、入库全流程</p>
+            <p class="text-gray-500 mt-1">管理药材采购订单，支持创建、入库全流程</p>
           </div>
           <button id="btn-new-po" class="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
             <i class="fa fa-plus mr-1"></i> 新建采购单
@@ -116,14 +116,14 @@
         </div>
 
         <!-- 统计卡片 -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div class="bg-white rounded-xl p-4 shadow-md">
             <p class="text-sm text-gray-500">采购单总数</p>
             <p class="text-2xl font-bold text-gray-800 mt-1" id="stat-total">0</p>
           </div>
           <div class="bg-white rounded-xl p-4 shadow-md">
-            <p class="text-sm text-gray-500">待审核</p>
-            <p class="text-2xl font-bold text-yellow-600 mt-1" id="stat-pending">0</p>
+            <p class="text-sm text-gray-500">待入库</p>
+            <p class="text-2xl font-bold text-yellow-600 mt-1" id="stat-open">0</p>
           </div>
           <div class="bg-white rounded-xl p-4 shadow-md">
             <p class="text-sm text-gray-500">已入库</p>
@@ -142,10 +142,8 @@
               <span class="text-sm text-gray-600">状态：</span>
               <select id="filter-status" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50">
                 <option value="">全部</option>
-                <option value="pending">待审核</option>
-                <option value="approved">已审核</option>
+                <option value="open">待入库</option>
                 <option value="completed">已入库</option>
-                <option value="rejected">已拒绝</option>
               </select>
             </div>
             <div class="flex items-center gap-2 flex-1 min-w-[200px]">
@@ -322,7 +320,7 @@ const API_BASE = '';
       return result.data;
     }
 
-    const STATUS_TEXT = { pending: '待审核', approved: '已审核', completed: '已入库', rejected: '已拒绝' };
+    const STATUS_TEXT = { open: '待入库', completed: '已入库' };
     let allHerbs = [];
     let allSuppliers = [];
 
@@ -398,7 +396,7 @@ const API_BASE = '';
 
     function updateStats(list) {
       document.getElementById('stat-total').textContent = list.length;
-      document.getElementById('stat-pending').textContent = list.filter(p => p.status === 'pending').length;
+      document.getElementById('stat-open').textContent = list.filter(p => p.status === 'open').length;
       document.getElementById('stat-completed').textContent = list.filter(p => p.status === 'completed').length;
       const total = list.filter(p => p.status === 'completed').reduce((acc, p) => acc + (p.totalAmount || 0), 0);
       document.getElementById('stat-amount').textContent = total.toFixed(2);
@@ -421,8 +419,7 @@ const API_BASE = '';
           <td class="px-4 py-3 text-sm text-gray-500">${po.createdAt ? po.createdAt.split(' ')[0] : '-'}</td>
           <td class="px-4 py-3 text-sm">
             <button onclick="viewPoDetail(${po.id})" class="text-primary hover:text-green-700 mr-2" title="查看详情"><i class="fa fa-eye"></i></button>
-            ${po.status === 'pending' ? `<button onclick="auditPo(${po.id})" class="text-yellow-600 hover:text-yellow-700 mr-2" title="审核"><i class="fa fa-check-circle"></i></button>` : ''}
-            ${po.status === 'approved' ? `<button onclick="inStockPo(${po.id})" class="text-green-600 hover:text-green-700 mr-2" title="入库"><i class="fa fa-download"></i></button>` : ''}
+            ${po.status === 'open' ? `<button onclick="inStockPo(${po.id})" class="text-green-600 hover:text-green-700 mr-2" title="入库"><i class="fa fa-download"></i></button>` : ''}
             ${po.status !== 'completed' ? `<button onclick="deletePo(${po.id})" class="text-red-500 hover:text-red-600" title="删除"><i class="fa fa-trash"></i></button>` : ''}
           </td>
         </tr>
@@ -513,7 +510,7 @@ const API_BASE = '';
         await api('POST', '/api/purchase-orders', { supplierId, supplierName, remark, items });
         closePoModal();
         loadPurchaseOrders();
-        alert('采购单创建成功');
+        alert('采购单创建成功，可直接入库');
       } catch (e) { /* error already shown */ }
     }
 
@@ -548,25 +545,12 @@ const API_BASE = '';
 
         const actions = document.getElementById('detail-actions');
         let btns = '<button onclick="document.getElementById(\'po-detail-modal\').classList.add(\'hidden\')" class="px-4 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50">关闭</button>';
-        if (po.status === 'pending') {
-          btns += `<button onclick="auditPo(${po.id})" class="px-4 py-2 bg-yellow-500 text-white rounded-lg font-medium hover:bg-yellow-600"><i class="fa fa-check-circle mr-1"></i> 审核</button>`;
-        }
-        if (po.status === 'approved') {
+        if (po.status === 'open') {
           btns += `<button onclick="inStockPo(${po.id})" class="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700"><i class="fa fa-download mr-1"></i> 确认入库</button>`;
         }
         actions.innerHTML = btns;
 
         document.getElementById('po-detail-modal').classList.remove('hidden');
-      } catch (e) { /* error shown */ }
-    }
-
-    async function auditPo(id) {
-      if (!confirm('确认审核通过该采购单？')) return;
-      try {
-        await api('PUT', `/api/purchase-orders/${id}/audit`, { action: 'approve' });
-        alert('审核通过');
-        document.getElementById('po-detail-modal').classList.add('hidden');
-        loadPurchaseOrders();
       } catch (e) { /* error shown */ }
     }
 

@@ -139,7 +139,7 @@
               <div>
                 <p class="text-sm text-gray-500">处方总金额</p>
                 <p class="text-3xl font-bold text-gray-800 mt-1" id="ov-total-amount">¥0</p>
-                <p class="text-xs text-gray-400 mt-1">已审核+已发药</p>
+                <p class="text-xs text-gray-400 mt-1">已发药金额</p>
               </div>
               <div class="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center text-yellow-600">
                 <i class="fa fa-rmb text-xl"></i>
@@ -397,7 +397,7 @@ const API_BASE = '';
     async function loadStatusChart() {
       try {
         const data = await api('GET', '/api/stats/status-distribution');
-        const colorMap = { '待审核': '#FFC107', '已审核': '#4CAF50', '已发药': '#2196F3', '已拒绝': '#F44336' };
+        const colorMap = { '待发药': '#FFC107', '已发药': '#2196F3' };
         const option = {
           tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
           legend: { orient: 'vertical', left: 'left', top: 'middle', textStyle: { fontSize: 12 } },
@@ -498,8 +498,7 @@ const API_BASE = '';
         const rx = data.prescriptions;
         const funnelData = [
           { value: rx.total, name: '全部处方' },
-          { value: rx.pending + rx.approved + rx.dispensed, name: '有效处方(剔除拒绝)' },
-          { value: rx.approved + rx.dispensed, name: '已审核' },
+          { value: rx.open + rx.dispensed, name: '有效处方' },
           { value: rx.dispensed, name: '已发药' },
         ];
         const option = {

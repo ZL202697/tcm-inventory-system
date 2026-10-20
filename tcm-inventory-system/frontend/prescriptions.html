@@ -109,7 +109,7 @@
         <div class="flex items-center justify-between">
           <div>
             <h2 class="text-2xl font-bold text-gray-800">处方管理</h2>
-            <p class="text-gray-500 mt-1">中医处方开具、审核与发药管理</p>
+            <p class="text-gray-500 mt-1">中医处方开具与发药管理</p>
           </div>
           <button id="btn-new-rx" class="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center">
             <i class="fa fa-plus mr-2"></i> 新建处方
@@ -117,26 +117,18 @@
         </div>
 
         <!-- 统计卡片 -->
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
           <div class="bg-white rounded-xl p-4 shadow-md">
             <p class="text-xs text-gray-500">处方总数</p>
             <p class="text-2xl font-bold text-gray-800 mt-1" id="stat-total">0</p>
           </div>
           <div class="bg-white rounded-xl p-4 shadow-md">
-            <p class="text-xs text-gray-500">待审核</p>
-            <p class="text-2xl font-bold text-yellow-600 mt-1" id="stat-pending">0</p>
-          </div>
-          <div class="bg-white rounded-xl p-4 shadow-md">
-            <p class="text-xs text-gray-500">已审核</p>
-            <p class="text-2xl font-bold text-green-600 mt-1" id="stat-approved">0</p>
+            <p class="text-xs text-gray-500">待发药</p>
+            <p class="text-2xl font-bold text-yellow-600 mt-1" id="stat-open">0</p>
           </div>
           <div class="bg-white rounded-xl p-4 shadow-md">
             <p class="text-xs text-gray-500">已发药</p>
             <p class="text-2xl font-bold text-blue-600 mt-1" id="stat-dispensed">0</p>
-          </div>
-          <div class="bg-white rounded-xl p-4 shadow-md">
-            <p class="text-xs text-gray-500">已拒绝</p>
-            <p class="text-2xl font-bold text-red-600 mt-1" id="stat-rejected">0</p>
           </div>
         </div>
 
@@ -147,10 +139,8 @@
               <span class="text-sm text-gray-600">状态：</span>
               <div class="flex gap-1" id="status-tabs">
                 <button class="tab-btn active" data-status="">全部</button>
-                <button class="tab-btn" data-status="pending">待审核</button>
-                <button class="tab-btn" data-status="approved">已审核</button>
+                <button class="tab-btn" data-status="open">待发药</button>
                 <button class="tab-btn" data-status="dispensed">已发药</button>
-                <button class="tab-btn" data-status="rejected">已拒绝</button>
               </div>
             </div>
             <div class="flex-1 min-w-[200px]">
@@ -291,26 +281,7 @@
     </div>
   </div>
 
-  <!-- 审核弹窗 -->
-  <div id="audit-modal" class="modal-overlay hidden">
-    <div class="modal-content max-w-md p-6">
-      <h3 class="text-xl font-bold text-gray-800 mb-4">处方审核</h3>
-      <p class="text-sm text-gray-600 mb-3" id="audit-rx-info"></p>
-      <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-1">审核备注</label>
-        <textarea id="audit-remark" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary" placeholder="请输入审核意见（可选）"></textarea>
-      </div>
-      <div class="flex justify-center gap-4">
-        <button id="audit-reject" class="px-6 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600">
-          <i class="fa fa-times mr-1"></i> 拒绝
-        </button>
-        <button id="audit-approve" class="px-6 py-2 bg-primary text-white rounded-lg font-medium hover:bg-green-700">
-          <i class="fa fa-check mr-1"></i> 通过
-        </button>
-      </div>
-    </div>
-        </div>
-    </div>
+  </div>
 
     <script>
 
@@ -373,7 +344,6 @@ const API_BASE = '';
     let currentUser = null, currentRole = null, currentName = null;
     let allHerbs = [];
     let currentStatusFilter = '';
-    let currentAuditRxId = null;
 
     async function api(method, url, body) {
       const opts = { method, headers: { 'Content-Type': 'application/json', 'X-User': sessionStorage.getItem('current_user') || '' } };
@@ -391,8 +361,8 @@ const API_BASE = '';
       return result.data;
     }
 
-    const STATUS_TEXT = { pending: '待审核', approved: '已审核', rejected: '已拒绝', dispensed: '已发药' };
-    const STATUS_CLASS = { pending: 'status-pending', approved: 'status-approved', rejected: 'status-rejected', dispensed: 'status-dispensed' };
+    const STATUS_TEXT = { open: '待发药', dispensed: '已发药' };
+    const STATUS_CLASS = { open: 'status-pending', dispensed: 'status-dispensed' };
 
     document.addEventListener('DOMContentLoaded', async () => {
       currentUser = sessionStorage.getItem('current_user');
@@ -442,10 +412,6 @@ const API_BASE = '';
         document.getElementById('detail-modal').classList.add('hidden');
       });
 
-      // 审核弹窗
-      document.getElementById('audit-approve').addEventListener('click', () => doAudit('approve'));
-      document.getElementById('audit-reject').addEventListener('click', () => doAudit('reject'));
-
       // 加载药材列表（用于下拉选择）
       try { allHerbs = await api('GET', '/api/herbs'); } catch(e) {}
 
@@ -466,10 +432,8 @@ const API_BASE = '';
 
     function updateStats(list) {
       document.getElementById('stat-total').textContent = list.length;
-      document.getElementById('stat-pending').textContent = list.filter(r => r.status === 'pending').length;
-      document.getElementById('stat-approved').textContent = list.filter(r => r.status === 'approved').length;
+      document.getElementById('stat-open').textContent = list.filter(r => r.status === 'open').length;
       document.getElementById('stat-dispensed').textContent = list.filter(r => r.status === 'dispensed').length;
-      document.getElementById('stat-rejected').textContent = list.filter(r => r.status === 'rejected').length;
     }
 
     function renderRxTable(list) {
@@ -482,8 +446,7 @@ const API_BASE = '';
       }
       empty.classList.add('hidden');
       tbody.innerHTML = list.map(rx => {
-        const canAudit = currentRole === 'admin' && rx.status === 'pending';
-        const canDispense = rx.status === 'approved';
+        const canDispense = rx.status === 'open';
         const canDelete = currentRole === 'admin' && rx.status !== 'dispensed';
         return `
           <tr class="herb-row">
@@ -501,7 +464,6 @@ const API_BASE = '';
             <td class="px-4 py-3 text-sm">
               <div class="flex gap-2">
                 <button onclick="viewDetail(${rx.id})" class="text-blue-600 hover:text-blue-800" title="查看详情"><i class="fa fa-eye"></i></button>
-                ${canAudit ? `<button onclick="openAudit(${rx.id})" class="text-green-600 hover:text-green-800" title="审核"><i class="fa fa-check-square-o"></i></button>` : ''}
                 ${canDispense ? `<button onclick="dispenseRx(${rx.id})" class="text-indigo-600 hover:text-indigo-800" title="发药"><i class="fa fa-medkit"></i></button>` : ''}
                 ${canDelete ? `<button onclick="deleteRx(${rx.id})" class="text-red-600 hover:text-red-800" title="删除"><i class="fa fa-trash"></i></button>` : ''}
               </div>
@@ -616,7 +578,7 @@ const API_BASE = '';
           advice: document.getElementById('rx-advice').value.trim(),
           items,
         });
-        alert('处方创建成功，等待审核');
+        alert('处方创建成功，可直接发药');
         closeRxModal();
         loadPrescriptions();
       } catch(e) {}
@@ -672,27 +634,6 @@ const API_BASE = '';
             <div class="text-lg font-bold text-primary">合计：¥${rx.totalAmount.toFixed(2)}</div>
           </div>`;
         document.getElementById('detail-modal').classList.remove('hidden');
-      } catch(e) {}
-    }
-
-    // ===== 审核 =====
-    function openAudit(id) {
-      currentAuditRxId = id;
-      document.getElementById('audit-rx-info').textContent = `正在审核处方 #${id}，请选择审核结果：`;
-      document.getElementById('audit-remark').value = '';
-      document.getElementById('audit-modal').classList.remove('hidden');
-    }
-
-    async function doAudit(action) {
-      if (!currentAuditRxId) return;
-      try {
-        await api('PUT', `/api/prescriptions/${currentAuditRxId}/audit`, {
-          action,
-          remark: document.getElementById('audit-remark').value.trim(),
-        });
-        alert(action === 'approve' ? '处方审核通过' : '处方已拒绝');
-        document.getElementById('audit-modal').classList.add('hidden');
-        loadPrescriptions();
       } catch(e) {}
     }
 
